@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"unicode"
 	"unicode/utf8"
 )
@@ -68,7 +69,7 @@ func listFiles(dir string) ([]FileEntry, error) {
 			return nil
 		}
 		if !safeName(rel) {
-			return fmt.Errorf("%q: unsafe file name (control characters, backticks or '|')", rel)
+			return fmt.Errorf("%q: unsafe file name (control characters, backticks, '|' or ':')", rel)
 		}
 		if !d.Type().IsRegular() {
 			return fmt.Errorf("%q: not a regular file (symlinks are refused)", rel)
@@ -119,7 +120,7 @@ func safeName(s string) bool {
 		return false
 	}
 	for _, r := range s {
-		if !unicode.IsPrint(r) || r == '`' || r == '|' {
+		if !unicode.IsPrint(r) || strings.ContainsRune("`|:", r) {
 			return false
 		}
 	}

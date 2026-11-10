@@ -42,6 +42,16 @@ func safetensorsWith(hdr string, hdrLen int, data []byte) []byte {
 
 func safetensors() []byte { return safetensorsWith(tensor4, 0, []byte{0, 0, 0, 0}) }
 
+// gguf builds a minimal GGUF v3 header: one tensor, no metadata, then rest.
+func gguf(rest string) []byte {
+	b := append([]byte("GGUF"), 3, 0, 0, 0)
+	b = binary.LittleEndian.AppendUint64(b, 1)
+	b = binary.LittleEndian.AppendUint64(b, 0)
+	return append(b, rest...)
+}
+
+func zeros(n int) []byte { return make([]byte, n) }
+
 func TestFormats(t *testing.T) {
 	dir := t.TempDir()
 	cases := []struct {
@@ -49,7 +59,7 @@ func TestFormats(t *testing.T) {
 		data []byte
 		ok   bool
 	}{
-		{"model.gguf", []byte("GGUF\x03\x00\x00\x00rest"), true},
+		{"model.gguf", gguf("rest"), true},
 		{"model.safetensors", safetensors(), true},
 		{"config.json", []byte(`{"a":1}`), true},
 		{"pytorch_model.bin", []byte("anything"), false},                   // pickle extension
@@ -68,6 +78,21 @@ func TestFormats(t *testing.T) {
 		{"tokenizer2.model", []byte("\x0a\x05hello"), true},
 		{"notes.txt", []byte("a\x00b"), false},
 		{"chat.jinja", []byte("{{ messages }}"), true},
+		{"pk.txt", []byte("PK\x03\x04hi"), false}, // zip magic is valid UTF-8, still refused
+		{"bom.json", []byte("\xef\xbb\xbf{\"a\":1}"), true},
+		{"LICENSE", []byte("Apache License 2.0"), true},
+		{".gitattributes", []byte("*.gguf filter=lfs"), true},
+		{"LICENSE.bin", []byte("x"), false},
+		{"short.gguf", []byte("GGUF\x03\x00\x00\x00"), false},     // header only, no counts
+		{"empty.gguf", append(gguf("")[:8], zeros(16)...), false}, // zero tensors
+		// safetensors layout: tensors must tile the data section exactly
+		{"gap.safetensors", safetensorsWith(`{"w":{"dtype":"U8","shape":[2],"data_offsets":[2,4]}}`, 0, zeros(4)), false},
+		{"overlap.safetensors", safetensorsWith(`{"a":{"dtype":"U8","shape":[4],"data_offsets":[0,4]},"b":{"dtype":"U8","shape":[2],"data_offsets":[2,4]}}`, 0, zeros(4)), false},
+		{"two.safetensors", safetensorsWith(`{"a":{"dtype":"U8","shape":[2],"data_offsets":[0,2]},"b":{"dtype":"U8","shape":[2],"data_offsets":[2,4]},"__metadata__":{"x":"y"}}`, 0, zeros(4)), true},
+		{"dup.safetensors", safetensorsWith(`{"w":{"dtype":"U8","shape":[9],"data_offsets":[0,9]},"w":{"dtype":"U8","shape":[4],"data_offsets":[0,4]}}`, 0, zeros(4)), false},
+		{"size.safetensors", safetensorsWith(`{"w":{"dtype":"F32","shape":[2],"data_offsets":[0,4]}}`, 0, zeros(4)), false},
+		{"neg.safetensors", safetensorsWith(`{"w":{"dtype":"U8","shape":[6],"data_offsets":[-2,4]}}`, 0, zeros(4)), false},
+		{"dtype.safetensors", safetensorsWith(`{"w":{"dtype":"F4","shape":[4],"data_offsets":[0,4]}}`, 0, zeros(4)), false},
 	}
 	for _, c := range cases {
 		p := filepath.Join(dir, c.name)
@@ -108,7 +133,7 @@ func sealedBundle(t *testing.T) (bundle, pub string, mb []byte) {
 	bundle = t.TempDir()
 	k, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	pub = pubPEM(t, keys, k)
-	write(t, filepath.Join(bundle, "model.gguf"), []byte("GGUF\x03\x00\x00\x00weights"))
+	write(t, filepath.Join(bundle, "model.gguf"), gguf("weights"))
 	write(t, filepath.Join(bundle, "tok/config.json"), []byte(`{}`))
 	files, err := listFiles(bundle)
 	if err != nil {
@@ -135,9 +160,9 @@ func TestSealVerifyTamper(t *testing.T) {
 	}
 	expect("clean bundle", "")
 
-	write(t, filepath.Join(bundle, "model.gguf"), []byte("GGUF\x03\x00\x00\x00WEIGHTS"))
+	write(t, filepath.Join(bundle, "model.gguf"), gguf("WEIGHTS"))
 	expect("changed weights", "hash mismatch")
-	write(t, filepath.Join(bundle, "model.gguf"), []byte("GGUF\x03\x00\x00\x00weights"))
+	write(t, filepath.Join(bundle, "model.gguf"), gguf("weights"))
 
 	write(t, filepath.Join(bundle, "extra.json"), []byte(`{}`))
 	expect("extra file", "unexpected file")
@@ -212,7 +237,7 @@ func TestZarf(t *testing.T) {
 		t.Error("--bin did not switch to the shipped verifier")
 	}
 
-	write(t, filepath.Join(bundle, "model.gguf"), []byte("GGUF\x03\x00\x00\x00evil"))
+	write(t, filepath.Join(bundle, "model.gguf"), gguf("evil"))
 	if err := zarfCmd([]string{bundle, "--key", pub, "--out", out}); err == nil {
 		t.Fatal("tampered bundle was packaged")
 	}
@@ -293,7 +318,7 @@ func TestSmoke(t *testing.T) {
 
 func TestHFProvenance(t *testing.T) {
 	dir := t.TempDir()
-	weights, cfg := []byte("GGUF\x03\x00\x00\x00weights"), []byte(`{"x":1}`)
+	weights, cfg := gguf("weights"), []byte(`{"x":1}`)
 	write(t, filepath.Join(dir, "m.gguf"), weights)
 	write(t, filepath.Join(dir, "config.json"), cfg)
 	files, _ := listFiles(dir)

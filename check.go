@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -26,6 +27,10 @@ var (
 	metaExts   = map[string]bool{".json": true, ".txt": true, ".md": true, ".jinja": true, ".model": true}
 	pickleExts = map[string]bool{".bin": true, ".pt": true, ".pth": true, ".pkl": true, ".pickle": true,
 		".ckpt": true, ".joblib": true, ".npy": true, ".npz": true}
+	textNames = map[string]bool{"LICENSE": true, "NOTICE": true, ".gitattributes": true} // common repo files, plain text
+	// bytes per element; unknown dtypes are refused
+	dtypeSize = map[string]int64{"F64": 8, "I64": 8, "U64": 8, "F32": 4, "I32": 4, "U32": 4,
+		"F16": 2, "BF16": 2, "I16": 2, "U16": 2, "I8": 1, "U8": 1, "BOOL": 1, "F8_E4M3": 1, "F8_E5M2": 1}
 )
 
 const (
@@ -84,7 +89,7 @@ func inspect(path string) (sum string, size int64, kind string, err error) {
 	}
 	h := sha256.New()
 	cr := &countingReader{r: f}
-	kind, err = checkFormat(io.TeeReader(cr, h), strings.ToLower(filepath.Ext(path)), st.Size())
+	kind, err = checkFormat(io.TeeReader(cr, h), filepath.Base(path), st.Size())
 	if err != nil {
 		return "", 0, "", err
 	}
@@ -99,18 +104,27 @@ func inspect(path string) (sum string, size int64, kind string, err error) {
 
 // checkFormat returns "weights" or "meta", or an error for pickle-based or
 // unrecognised content. It reads from r, which may stop partway.
-func checkFormat(r io.Reader, ext string, size int64) (string, error) {
+func checkFormat(r io.Reader, name string, size int64) (string, error) {
+	ext := strings.ToLower(filepath.Ext(name))
+	if textNames[name] {
+		ext = ".txt"
+	}
 	if pickleExts[ext] {
 		return "", errors.New("pickle-based format refused: it can execute code when loaded; convert to safetensors or GGUF")
 	}
 	switch ext {
 	case ".gguf":
-		var hdr [8]byte
+		// magic, version, tensor count, metadata count (GGUF v2/v3 layout)
+		var hdr [24]byte
 		if _, err := io.ReadFull(r, hdr[:]); err != nil || string(hdr[:4]) != "GGUF" {
 			return "", errors.New("named .gguf but missing GGUF header")
 		}
-		if v := binary.LittleEndian.Uint32(hdr[4:]); v < 1 || v > 3 {
+		if v := binary.LittleEndian.Uint32(hdr[4:]); v < 2 || v > 3 {
 			return "", fmt.Errorf("unsupported GGUF version %d", v)
+		}
+		tensors, kvs := binary.LittleEndian.Uint64(hdr[8:]), binary.LittleEndian.Uint64(hdr[16:])
+		if tensors == 0 || tensors > 1<<20 || kvs > 1<<20 {
+			return "", fmt.Errorf("implausible GGUF header (%d tensors, %d metadata keys)", tensors, kvs)
 		}
 		return "weights", nil
 	case ".safetensors":
@@ -131,14 +145,14 @@ func checkFormat(r io.Reader, ext string, size int64) (string, error) {
 	}
 	switch ext {
 	case ".json":
-		if !json.Valid(b) {
+		if !json.Valid(bytes.TrimPrefix(b, []byte("\xef\xbb\xbf"))) { // allow a UTF-8 BOM
 			return "", errors.New("named .json but not valid JSON")
 		}
-	case ".model": // sentencepiece ModelProto: starts with field 1 (pieces), wire type 2
+	case ".model": // sentencepiece ModelProto starts with field 1 (pieces), wire type 2; shallow check
 		if len(b) == 0 || b[0] != 0x0a {
 			return "", errors.New("named .model but not a sentencepiece model")
 		}
-	default: // .txt .md .jinja: plain text only (also rules out ASCII pickles' binary siblings)
+	default: // .txt .md .jinja and textNames: UTF-8 text with no NUL bytes
 		if !utf8.Valid(b) || bytes.IndexByte(b, 0) >= 0 {
 			return "", errors.New("text file contains binary data")
 		}
@@ -161,32 +175,95 @@ func checkSafetensors(r io.Reader, size int64) error {
 	if _, err := io.ReadFull(r, buf); err != nil {
 		return err
 	}
-	var hdr map[string]json.RawMessage
-	if buf[0] != '{' || json.Unmarshal(bytes.TrimRight(buf, " "), &hdr) != nil {
+	if buf[0] != '{' {
 		return errors.New("invalid safetensors JSON header")
 	}
-	dataLen := size - 8 - int64(n)
-	var end int64
+	hdr, err := uniqueKeys(bytes.TrimRight(buf, " "))
+	if err != nil {
+		return fmt.Errorf("invalid safetensors JSON header: %w", err)
+	}
+	type span struct {
+		name       string
+		begin, end int64
+	}
+	var spans []span
 	for k, raw := range hdr {
 		if k == "__metadata__" {
 			continue
 		}
 		var t struct {
+			Dtype   string  `json:"dtype"`
+			Shape   []int64 `json:"shape"`
 			Offsets []int64 `json:"data_offsets"`
 		}
 		if json.Unmarshal(raw, &t) != nil || len(t.Offsets) != 2 {
-			return fmt.Errorf("tensor %q: bad data_offsets", k)
+			return fmt.Errorf("tensor %q: bad entry", k)
+		}
+		want, ok := dtypeSize[t.Dtype]
+		if !ok {
+			return fmt.Errorf("tensor %q: unknown dtype %q", k, t.Dtype)
+		}
+		for _, d := range t.Shape {
+			if d < 0 || (d > 0 && want > (1<<62)/d) {
+				return fmt.Errorf("tensor %q: bad shape", k)
+			}
+			want *= d
 		}
 		b, e := t.Offsets[0], t.Offsets[1]
-		if b < 0 || e < b || e > dataLen {
-			return fmt.Errorf("tensor %q: offsets outside the file", k)
+		if b < 0 || e < b || e-b != want {
+			return fmt.Errorf("tensor %q: offsets do not match dtype and shape", k)
 		}
-		end = max(end, e)
+		spans = append(spans, span{k, b, e})
 	}
-	if end != dataLen {
+	// Tensors must tile the data section exactly: no gaps, overlaps, or tail,
+	// so nothing (a zip, a pickle) can hide between or after them.
+	sort.Slice(spans, func(i, j int) bool { return spans[i].begin < spans[j].begin })
+	var at int64
+	for _, s := range spans {
+		if s.begin != at {
+			return fmt.Errorf("tensor %q: gap or overlap in data section", s.name)
+		}
+		at = s.end
+	}
+	if at != size-8-int64(n) {
 		return errors.New("safetensors has data not covered by any tensor (possible hidden payload)")
 	}
 	return nil
+}
+
+// uniqueKeys decodes a top-level JSON object and refuses duplicate keys,
+// which different parsers resolve differently.
+func uniqueKeys(b []byte) (map[string]json.RawMessage, error) {
+	dec := json.NewDecoder(bytes.NewReader(b))
+	if t, err := dec.Token(); err != nil || t != json.Delim('{') {
+		return nil, errors.New("not a JSON object")
+	}
+	out := map[string]json.RawMessage{}
+	for dec.More() {
+		t, err := dec.Token()
+		if err != nil {
+			return nil, err
+		}
+		k, ok := t.(string)
+		if !ok {
+			return nil, errors.New("bad key")
+		}
+		if _, dup := out[k]; dup {
+			return nil, fmt.Errorf("duplicate key %q", k)
+		}
+		var v json.RawMessage
+		if err := dec.Decode(&v); err != nil {
+			return nil, err
+		}
+		out[k] = v
+	}
+	if _, err := dec.Token(); err != nil { // closing brace
+		return nil, err
+	}
+	if dec.More() {
+		return nil, errors.New("trailing data after JSON object")
+	}
+	return out, nil
 }
 
 // looksLikePickle catches binary pickles (protocol 2+ starts with 0x80) and
