@@ -145,6 +145,25 @@ func TestSealVerifyTamper(t *testing.T) {
 	expect("symlink", "symlinks are refused")
 	os.Remove(filepath.Join(bundle, "link.json"))
 
+	fake := filepath.Join(bundle, "x\n- ✔ PASS.json") // would print a fake PASS line in the report
+	write(t, fake, []byte(`{}`))
+	expect("injected file name", "unsafe file name")
+	os.Remove(fake)
+
+	victim := filepath.Join(t.TempDir(), "cosign.key")
+	write(t, victim, []byte("secret"))
+	os.Remove(filepath.Join(bundle, manifestName))
+	os.Symlink(victim, filepath.Join(bundle, manifestName))
+	expect("symlinked manifest", "not a regular file")
+	if err := clearReserved(bundle); err == nil {
+		t.Error("seal would write through a symlinked manifest")
+	}
+	if b, _ := os.ReadFile(victim); string(b) != "secret" {
+		t.Error("symlink target was modified")
+	}
+	os.Remove(filepath.Join(bundle, manifestName))
+	write(t, filepath.Join(bundle, manifestName), mb)
+
 	write(t, filepath.Join(bundle, manifestName), append(mb, ' '))
 	expect("edited manifest", "tampered")
 	write(t, filepath.Join(bundle, manifestName), mb)

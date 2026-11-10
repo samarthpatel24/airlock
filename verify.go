@@ -49,11 +49,11 @@ func doVerify(dir, keyPath string, r *report) error {
 		return err
 	}
 	r.KeyFP = fp
-	mb, err := os.ReadFile(filepath.Join(dir, manifestName))
+	mb, err := readReserved(dir, manifestName)
 	if err != nil {
 		return err
 	}
-	sb, err := os.ReadFile(filepath.Join(dir, signatureName))
+	sb, err := readReserved(dir, signatureName)
 	if err != nil {
 		return err
 	}
@@ -146,6 +146,9 @@ type report struct {
 func (r *report) pass(s string) { r.Passed = append(r.Passed, s) }
 
 func (r *report) write(path string, failure error) error {
+	if st, err := os.Lstat(path); err == nil && !st.Mode().IsRegular() {
+		return fmt.Errorf("report path %q is not a regular file; refusing to write through it", path)
+	}
 	var b strings.Builder
 	result := "PASS"
 	if failure != nil {

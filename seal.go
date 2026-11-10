@@ -55,6 +55,9 @@ func seal(args []string) error {
 	m.Checks = append(m.Checks, mal)
 	fmt.Println(mal)
 
+	if err := clearReserved(dir); err != nil {
+		return err
+	}
 	if err := writeJSON(filepath.Join(dir, manifestName), &m); err != nil {
 		return err
 	}

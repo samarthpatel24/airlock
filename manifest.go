@@ -4,12 +4,15 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
+	"unicode"
+	"unicode/utf8"
 )
 
 const (
@@ -64,6 +67,9 @@ func listFiles(dir string) ([]FileEntry, error) {
 		if rel == manifestName || rel == signatureName {
 			return nil
 		}
+		if !safeName(rel) {
+			return fmt.Errorf("%q: unsafe file name (control characters, backticks or '|')", rel)
+		}
 		if !d.Type().IsRegular() {
 			return fmt.Errorf("%q: not a regular file (symlinks are refused)", rel)
 		}
@@ -106,10 +112,71 @@ func checkFiles(dir string, m *Manifest) ([]FileEntry, error) {
 	return onDisk, nil
 }
 
+// safeName refuses names that could fake lines in the report or send
+// escape sequences to a terminal.
+func safeName(s string) bool {
+	if !utf8.ValidString(s) {
+		return false
+	}
+	for _, r := range s {
+		if !unicode.IsPrint(r) || r == '`' || r == '|' {
+			return false
+		}
+	}
+	return true
+}
+
+const maxReserved = 16 << 20 // manifest and signature are small
+
+// readReserved reads airlock's own manifest or signature, refusing symlinks,
+// devices and oversized files.
+func readReserved(dir, name string) ([]byte, error) {
+	p := filepath.Join(dir, name)
+	st, err := os.Lstat(p)
+	if err != nil {
+		return nil, err
+	}
+	if !st.Mode().IsRegular() || st.Size() > maxReserved {
+		return nil, fmt.Errorf("%s: not a regular file of sane size", name)
+	}
+	return os.ReadFile(p)
+}
+
+// clearReserved removes an old manifest and signature before sealing, and
+// refuses if either is a symlink, so a planted link can't redirect the write.
+func clearReserved(dir string) error {
+	for _, n := range []string{manifestName, signatureName} {
+		p := filepath.Join(dir, n)
+		st, err := os.Lstat(p)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if !st.Mode().IsRegular() {
+			return fmt.Errorf("%s exists and is not a regular file; refusing to write through it", n)
+		}
+		if err := os.Remove(p); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// writeJSON creates path exclusively: it never follows or overwrites an existing file.
 func writeJSON(path string, v any) error {
 	b, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, append(b, '\n'), 0o644)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(append(b, '\n')); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
 }
