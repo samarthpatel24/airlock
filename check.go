@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -17,11 +18,11 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
-// Formats are allowed by content (magic bytes), not by file name alone.
+// Formats are allowed by extension AND content. Anything else is refused.
 var (
-	weightExts = map[string]bool{".gguf": true, ".safetensors": true}
 	metaExts   = map[string]bool{".json": true, ".txt": true, ".md": true, ".jinja": true, ".model": true}
 	pickleExts = map[string]bool{".bin": true, ".pt": true, ".pth": true, ".pkl": true, ".pickle": true,
 		".ckpt": true, ".joblib": true, ".npy": true, ".npz": true}
@@ -42,94 +43,160 @@ func checkCmd(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := checkFormats(fs.Arg(0), files); err != nil {
+	if err := needWeights(files); err != nil {
 		return err
 	}
 	fmt.Printf("✔ %d files: safe formats only\n", len(files))
 	return nil
 }
 
-func checkFormats(dir string, files []FileEntry) error {
-	weights := 0
+func needWeights(files []FileEntry) error {
 	for _, f := range files {
-		kind, err := checkModelFile(filepath.Join(dir, filepath.FromSlash(f.Path)), f.Size)
-		if err != nil {
-			return fmt.Errorf("%s: %w", f.Path, err)
-		}
-		if kind == "weights" {
-			weights++
+		if f.Kind == "weights" {
+			return nil
 		}
 	}
-	if weights == 0 {
-		return errors.New("no model weights found (.gguf or .safetensors)")
-	}
-	return nil
+	return errors.New("no model weights found (.gguf or .safetensors)")
 }
 
-// checkModelFile returns "weights" or "meta", or an error if the file is a
-// pickle-based format (can run code when loaded) or anything unrecognised.
-func checkModelFile(path string, size int64) (string, error) {
+type countingReader struct {
+	r io.Reader
+	n int64
+}
+
+func (c *countingReader) Read(p []byte) (int, error) {
+	n, err := c.r.Read(p)
+	c.n += int64(n)
+	return n, err
+}
+
+// inspect reads a file exactly once: the bytes that pass the format check
+// are the same bytes that get hashed.
+func inspect(path string) (sum string, size int64, kind string, err error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return "", err
+		return "", 0, "", err
 	}
 	defer f.Close()
-	head := make([]byte, 8)
-	n, _ := io.ReadFull(f, head)
-	head = head[:n]
-	ext := strings.ToLower(filepath.Ext(path))
+	st, err := f.Stat()
+	if err != nil {
+		return "", 0, "", err
+	}
+	h := sha256.New()
+	cr := &countingReader{r: f}
+	kind, err = checkFormat(io.TeeReader(cr, h), strings.ToLower(filepath.Ext(path)), st.Size())
+	if err != nil {
+		return "", 0, "", err
+	}
+	if _, err := io.Copy(h, cr); err != nil {
+		return "", 0, "", err
+	}
+	if cr.n != st.Size() {
+		return "", 0, "", errors.New("file changed while being read")
+	}
+	return hex.EncodeToString(h.Sum(nil)), cr.n, kind, nil
+}
 
-	if pickleExts[ext] || looksLikePickle(head) {
+// checkFormat returns "weights" or "meta", or an error for pickle-based or
+// unrecognised content. It reads from r, which may stop partway.
+func checkFormat(r io.Reader, ext string, size int64) (string, error) {
+	if pickleExts[ext] {
 		return "", errors.New("pickle-based format refused: it can execute code when loaded; convert to safetensors or GGUF")
 	}
 	switch ext {
 	case ".gguf":
-		if !bytes.HasPrefix(head, []byte("GGUF")) {
+		var hdr [8]byte
+		if _, err := io.ReadFull(r, hdr[:]); err != nil || string(hdr[:4]) != "GGUF" {
 			return "", errors.New("named .gguf but missing GGUF header")
+		}
+		if v := binary.LittleEndian.Uint32(hdr[4:]); v < 1 || v > 3 {
+			return "", fmt.Errorf("unsupported GGUF version %d", v)
 		}
 		return "weights", nil
 	case ".safetensors":
-		if len(head) < 8 {
-			return "", errors.New("safetensors file too short")
-		}
-		hdr := binary.LittleEndian.Uint64(head)
-		if hdr == 0 || hdr > maxSafetensorsHdr || int64(hdr)+8 > size {
-			return "", errors.New("invalid safetensors header length")
-		}
-		buf := make([]byte, hdr)
-		if _, err := io.ReadFull(f, buf); err != nil {
-			return "", err
-		}
-		if buf[0] != '{' || !json.Valid(bytes.TrimRight(buf, " ")) {
-			return "", errors.New("invalid safetensors JSON header")
-		}
-		return "weights", nil
+		return "weights", checkSafetensors(r, size)
 	}
-	if metaExts[ext] {
-		if size > maxMetaSize {
-			return "", fmt.Errorf("metadata file unexpectedly large (%d bytes)", size)
-		}
-		if ext == ".json" { // also catches old ASCII pickles (protocol 0/1) renamed to .json
-			b, err := os.ReadFile(path)
-			if err != nil {
-				return "", err
-			}
-			if !json.Valid(b) {
-				return "", errors.New("named .json but not valid JSON")
-			}
-		}
-		return "meta", nil
+	if !metaExts[ext] {
+		return "", fmt.Errorf("unknown format %q not allowed", ext)
 	}
-	return "", fmt.Errorf("unknown format %q not allowed", ext)
+	if size > maxMetaSize {
+		return "", fmt.Errorf("metadata file unexpectedly large (%d bytes)", size)
+	}
+	b, err := io.ReadAll(io.LimitReader(r, maxMetaSize))
+	if err != nil {
+		return "", err
+	}
+	if looksLikePickle(b) {
+		return "", errors.New("pickle or zip content under a metadata name refused")
+	}
+	switch ext {
+	case ".json":
+		if !json.Valid(b) {
+			return "", errors.New("named .json but not valid JSON")
+		}
+	case ".model": // sentencepiece ModelProto: starts with field 1 (pieces), wire type 2
+		if len(b) == 0 || b[0] != 0x0a {
+			return "", errors.New("named .model but not a sentencepiece model")
+		}
+	default: // .txt .md .jinja: plain text only (also rules out ASCII pickles' binary siblings)
+		if !utf8.Valid(b) || bytes.IndexByte(b, 0) >= 0 {
+			return "", errors.New("text file contains binary data")
+		}
+	}
+	return "meta", nil
 }
 
-// looksLikePickle catches renamed pickles: protocol 2+ starts with 0x80, and
-// torch.save writes a zip archive that contains a pickle.
-func looksLikePickle(head []byte) bool {
-	if len(head) >= 2 && head[0] == 0x80 && head[1] >= 2 && head[1] <= 5 {
+// checkSafetensors validates the header and that the tensors exactly cover
+// the data section, so nothing (a zip, a pickle) can hide after them.
+func checkSafetensors(r io.Reader, size int64) error {
+	var lb [8]byte
+	if _, err := io.ReadFull(r, lb[:]); err != nil {
+		return errors.New("safetensors file too short")
+	}
+	n := binary.LittleEndian.Uint64(lb[:])
+	if n == 0 || n > maxSafetensorsHdr || int64(n)+8 > size {
+		return errors.New("invalid safetensors header length")
+	}
+	buf := make([]byte, n)
+	if _, err := io.ReadFull(r, buf); err != nil {
+		return err
+	}
+	var hdr map[string]json.RawMessage
+	if buf[0] != '{' || json.Unmarshal(bytes.TrimRight(buf, " "), &hdr) != nil {
+		return errors.New("invalid safetensors JSON header")
+	}
+	dataLen := size - 8 - int64(n)
+	var end int64
+	for k, raw := range hdr {
+		if k == "__metadata__" {
+			continue
+		}
+		var t struct {
+			Offsets []int64 `json:"data_offsets"`
+		}
+		if json.Unmarshal(raw, &t) != nil || len(t.Offsets) != 2 {
+			return fmt.Errorf("tensor %q: bad data_offsets", k)
+		}
+		b, e := t.Offsets[0], t.Offsets[1]
+		if b < 0 || e < b || e > dataLen {
+			return fmt.Errorf("tensor %q: offsets outside the file", k)
+		}
+		end = max(end, e)
+	}
+	if end != dataLen {
+		return errors.New("safetensors has data not covered by any tensor (possible hidden payload)")
+	}
+	return nil
+}
+
+// looksLikePickle catches binary pickles (protocol 2+ starts with 0x80) and
+// torch.save zip archives. Only used on non-weight files: a safetensors
+// header length can legitimately start with these bytes.
+func looksLikePickle(b []byte) bool {
+	if len(b) >= 2 && b[0] == 0x80 && b[1] >= 2 && b[1] <= 5 {
 		return true
 	}
-	return bytes.HasPrefix(head, []byte("PK\x03\x04"))
+	return bytes.HasPrefix(b, []byte("PK\x03\x04"))
 }
 
 // --- provenance: compare local files against a pinned Hugging Face commit ---
@@ -186,20 +253,22 @@ func checkHF(dir, repo, rev string, files []FileEntry) error {
 	for _, f := range files {
 		s, ok := upstream[f.Path]
 		if !ok {
-			return fmt.Errorf("%s: not in %s@%s", f.Path, repo, rev[:12])
+			return fmt.Errorf("%q: not in %s@%s", f.Path, repo, rev[:12])
 		}
 		if s.LFS != nil {
 			if s.LFS.SHA256 != f.SHA256 {
-				return fmt.Errorf("%s: sha256 differs from upstream", f.Path)
+				return fmt.Errorf("%q: sha256 differs from upstream", f.Path)
 			}
 			continue
 		}
+		// ponytail: small non-LFS files are matched by git's SHA-1 blob id, the
+		// only hash HF publishes for them; fetch and sha256 them if that matters.
 		sum, err := gitBlobSHA1(filepath.Join(dir, filepath.FromSlash(f.Path)))
 		if err != nil {
 			return err
 		}
 		if sum != s.BlobID {
-			return fmt.Errorf("%s: git blob hash differs from upstream", f.Path)
+			return fmt.Errorf("%q: git blob hash differs from upstream", f.Path)
 		}
 	}
 	return nil

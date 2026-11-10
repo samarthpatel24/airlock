@@ -26,11 +26,19 @@ func write(t *testing.T, path string, data []byte) {
 	}
 }
 
-func safetensors() []byte {
-	hdr := []byte(`{"w":{"dtype":"F32","shape":[1],"data_offsets":[0,4]}}`)
-	b := binary.LittleEndian.AppendUint64(nil, uint64(len(hdr)))
-	return append(append(b, hdr...), 0, 0, 0, 0)
+const tensor4 = `{"w":{"dtype":"F32","shape":[1],"data_offsets":[0,4]}}`
+
+// safetensorsWith builds a file whose JSON header is space-padded to hdrLen.
+func safetensorsWith(hdr string, hdrLen int, data []byte) []byte {
+	h := []byte(hdr)
+	for len(h) < hdrLen {
+		h = append(h, ' ')
+	}
+	b := binary.LittleEndian.AppendUint64(nil, uint64(len(h)))
+	return append(append(b, h...), data...)
 }
+
+func safetensors() []byte { return safetensorsWith(tensor4, 0, []byte{0, 0, 0, 0}) }
 
 func TestFormats(t *testing.T) {
 	dir := t.TempDir()
@@ -49,11 +57,20 @@ func TestFormats(t *testing.T) {
 		{"fake.gguf", []byte("NOPE1234"), false},                           // wrong header
 		{"bad.safetensors", []byte("\xff\xff\xff\xff\xff\xff\xff\x7f"), false},
 		{"run.sh", []byte("#!/bin/sh"), false}, // unknown format
+		{"v9.gguf", []byte("GGUF\x09\x00\x00\x00"), false},
+		// header length 0x280 starts with bytes 0x80 0x02, which look like a pickle
+		{"padded.safetensors", safetensorsWith(tensor4, 0x280, []byte{0, 0, 0, 0}), true},
+		{"polyglot.safetensors", safetensorsWith(tensor4, 0, []byte("\x00\x00\x00\x00PK\x03\x04hidden")), false},
+		{"oob.safetensors", safetensorsWith(`{"w":{"data_offsets":[0,99]}}`, 0, []byte{0, 0, 0, 0}), false},
+		{"tokenizer.model", []byte("(dp0\nS'a'\np1\n."), false}, // ASCII pickle under a metadata name
+		{"tokenizer2.model", []byte("\x0a\x05hello"), true},
+		{"notes.txt", []byte("a\x00b"), false},
+		{"chat.jinja", []byte("{{ messages }}"), true},
 	}
 	for _, c := range cases {
 		p := filepath.Join(dir, c.name)
 		write(t, p, c.data)
-		_, err := checkModelFile(p, int64(len(c.data)))
+		_, _, _, err := inspect(p)
 		if (err == nil) != c.ok {
 			t.Errorf("%s: ok=%v, err=%v", c.name, c.ok, err)
 		}
@@ -89,7 +106,7 @@ func sealedBundle(t *testing.T) (bundle, pub string, mb []byte) {
 	bundle = t.TempDir()
 	k, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	pub = pubPEM(t, keys, k)
-	write(t, filepath.Join(bundle, "model.gguf"), []byte("GGUF\x03weights"))
+	write(t, filepath.Join(bundle, "model.gguf"), []byte("GGUF\x03\x00\x00\x00weights"))
 	write(t, filepath.Join(bundle, "tok/config.json"), []byte(`{}`))
 	files, err := listFiles(bundle)
 	if err != nil {
@@ -116,9 +133,9 @@ func TestSealVerifyTamper(t *testing.T) {
 	}
 	expect("clean bundle", "")
 
-	write(t, filepath.Join(bundle, "model.gguf"), []byte("GGUF\x03WEIGHTS"))
+	write(t, filepath.Join(bundle, "model.gguf"), []byte("GGUF\x03\x00\x00\x00WEIGHTS"))
 	expect("changed weights", "hash mismatch")
-	write(t, filepath.Join(bundle, "model.gguf"), []byte("GGUF\x03weights"))
+	write(t, filepath.Join(bundle, "model.gguf"), []byte("GGUF\x03\x00\x00\x00weights"))
 
 	write(t, filepath.Join(bundle, "extra.json"), []byte(`{}`))
 	expect("extra file", "unexpected file")
@@ -174,7 +191,7 @@ func TestZarf(t *testing.T) {
 		t.Error("--bin did not switch to the shipped verifier")
 	}
 
-	write(t, filepath.Join(bundle, "model.gguf"), []byte("GGUF\x03evil"))
+	write(t, filepath.Join(bundle, "model.gguf"), []byte("GGUF\x03\x00\x00\x00evil"))
 	if err := zarfCmd([]string{bundle, "--key", pub, "--out", out}); err == nil {
 		t.Fatal("tampered bundle was packaged")
 	}
@@ -182,7 +199,7 @@ func TestZarf(t *testing.T) {
 
 func TestHFProvenance(t *testing.T) {
 	dir := t.TempDir()
-	weights, cfg := []byte("GGUF\x03weights"), []byte(`{"x":1}`)
+	weights, cfg := []byte("GGUF\x03\x00\x00\x00weights"), []byte(`{"x":1}`)
 	write(t, filepath.Join(dir, "m.gguf"), weights)
 	write(t, filepath.Join(dir, "config.json"), cfg)
 	files, _ := listFiles(dir)

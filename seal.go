@@ -29,7 +29,7 @@ func seal(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := checkFormats(dir, files); err != nil {
+	if err := needWeights(files); err != nil {
 		return err
 	}
 	m := Manifest{Version: 1, Tool: "airlock " + version, Created: time.Now().UTC().Format(time.RFC3339), Files: files}

@@ -67,14 +67,15 @@ func doVerify(dir, keyPath string, r *report) error {
 		return fmt.Errorf("manifest: %w", err)
 	}
 	r.M = &m
-	if err := checkFiles(dir, &m); err != nil {
+	files, err := checkFiles(dir, &m)
+	if err != nil {
 		return err
 	}
 	r.pass(fmt.Sprintf("all %d files match the manifest (no missing, extra, or changed files)", len(m.Files)))
-	if err := checkFormats(dir, m.Files); err != nil {
+	if err := needWeights(files); err != nil {
 		return err
 	}
-	r.pass("formats re-checked offline: no pickle, no unknown files")
+	r.pass("formats re-checked offline on the same bytes that were hashed: no pickle, no unknown files")
 	return nil
 }
 
