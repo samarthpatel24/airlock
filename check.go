@@ -117,19 +117,7 @@ func checkFormat(r io.Reader, name string, size int64) (string, error) {
 	}
 	switch ext {
 	case ".gguf":
-		// magic, version, tensor count, metadata count (GGUF v2/v3 layout)
-		var hdr [24]byte
-		if _, err := io.ReadFull(r, hdr[:]); err != nil || string(hdr[:4]) != "GGUF" {
-			return "", errors.New("named .gguf but missing GGUF header")
-		}
-		if v := binary.LittleEndian.Uint32(hdr[4:]); v < 2 || v > 3 {
-			return "", fmt.Errorf("unsupported GGUF version %d", v)
-		}
-		tensors, kvs := binary.LittleEndian.Uint64(hdr[8:]), binary.LittleEndian.Uint64(hdr[16:])
-		if tensors == 0 || tensors > 1<<20 || kvs > 1<<20 {
-			return "", fmt.Errorf("implausible GGUF header (%d tensors, %d metadata keys)", tensors, kvs)
-		}
-		return "weights", nil
+		return "weights", checkGGUF(r, size)
 	case ".safetensors":
 		return "weights", checkSafetensors(r, size)
 	}

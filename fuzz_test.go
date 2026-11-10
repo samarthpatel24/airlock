@@ -18,6 +18,7 @@ func FuzzCheckFormat(f *testing.F) {
 	f.Add(uint8(1), safetensors())
 	f.Add(uint8(1), safetensorsWith(tensor4, 0x280, []byte{0, 0, 0, 0}))
 	f.Add(uint8(0), gguf("rest"))
+	f.Add(uint8(0), ggufFile([][]byte{kvStr("general.name", "q"), kvStrs("t", "a", "b"), kvU32("general.alignment", 32)}, []gt{{name: "a", dims: []uint64{8}, data: zeros(32)}, {name: "b", typ: 12, dims: []uint64{256}, data: zeros(144)}}))
 	f.Add(uint8(2), []byte(`{"a":1}`))
 	f.Add(uint8(3), []byte("\x0a\x05hello"))
 	f.Add(uint8(4), []byte("(dp0\nS'a'\np1\n."))

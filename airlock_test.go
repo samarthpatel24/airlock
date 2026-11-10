@@ -44,12 +44,79 @@ func safetensorsWith(hdr string, hdrLen int, data []byte) []byte {
 
 func safetensors() []byte { return safetensorsWith(tensor4, 0, []byte{0, 0, 0, 0}) }
 
-// gguf builds a minimal GGUF v3 header: one tensor, no metadata, then rest.
+// gguf builds a valid GGUF v3 file with one F32 tensor holding rest
+// (zero-padded to whole floats).
 func gguf(rest string) []byte {
+	data := []byte(rest)
+	for len(data) == 0 || len(data)%4 != 0 {
+		data = append(data, 0)
+	}
+	return ggufFile(nil, []gt{{name: "w", dims: []uint64{uint64(len(data) / 4)}, data: data}})
+}
+
+// gt is one tensor for ggufFile; skip inserts extra bytes before it.
+type gt struct {
+	name string
+	typ  uint32
+	dims []uint64
+	data []byte
+	skip int
+}
+
+func ggufStr(b []byte, s string) []byte {
+	return append(binary.LittleEndian.AppendUint64(b, uint64(len(s))), s...)
+}
+
+func pad32(b []byte) []byte {
+	for len(b)%32 != 0 {
+		b = append(b, 0)
+	}
+	return b
+}
+
+// ggufFile lays out header, metadata, tensor infos and data the way
+// llama.cpp writes them (32-byte alignment, each tensor padded).
+func ggufFile(kvs [][]byte, ts []gt) []byte {
 	b := append([]byte("GGUF"), 3, 0, 0, 0)
-	b = binary.LittleEndian.AppendUint64(b, 1)
-	b = binary.LittleEndian.AppendUint64(b, 0)
-	return append(b, rest...)
+	b = binary.LittleEndian.AppendUint64(b, uint64(len(ts)))
+	b = binary.LittleEndian.AppendUint64(b, uint64(len(kvs)))
+	for _, kv := range kvs {
+		b = append(b, kv...)
+	}
+	var off int
+	for _, t := range ts {
+		off += t.skip
+		b = ggufStr(b, t.name)
+		b = binary.LittleEndian.AppendUint32(b, uint32(len(t.dims)))
+		for _, d := range t.dims {
+			b = binary.LittleEndian.AppendUint64(b, d)
+		}
+		b = binary.LittleEndian.AppendUint32(b, t.typ)
+		b = binary.LittleEndian.AppendUint64(b, uint64(off))
+		off = (off + len(t.data) + 31) / 32 * 32
+	}
+	b = pad32(b)
+	for _, t := range ts {
+		b = pad32(append(append(b, zeros(t.skip)...), t.data...))
+	}
+	return b
+}
+
+func kvU32(k string, v uint32) []byte {
+	return binary.LittleEndian.AppendUint32(binary.LittleEndian.AppendUint32(ggufStr(nil, k), 4), v)
+}
+
+func kvStr(k, v string) []byte {
+	return ggufStr(binary.LittleEndian.AppendUint32(ggufStr(nil, k), 8), v)
+}
+
+func kvStrs(k string, vs ...string) []byte {
+	b := binary.LittleEndian.AppendUint32(binary.LittleEndian.AppendUint32(ggufStr(nil, k), 9), 8)
+	b = binary.LittleEndian.AppendUint64(b, uint64(len(vs)))
+	for _, v := range vs {
+		b = ggufStr(b, v)
+	}
+	return b
 }
 
 func zeros(n int) []byte { return make([]byte, n) }
@@ -87,6 +154,18 @@ func TestFormats(t *testing.T) {
 		{"LICENSE.bin", []byte("x"), false},
 		{"short.gguf", []byte("GGUF\x03\x00\x00\x00"), false},     // header only, no counts
 		{"empty.gguf", append(gguf("")[:8], zeros(16)...), false}, // zero tensors
+		// GGUF layout: metadata parsed, tensors must tile the data section
+		{"meta.gguf", ggufFile([][]byte{kvStr("general.name", "q"), kvStrs("tokenizer.ggml.tokens", "a", "b"), kvU32("general.alignment", 32)},
+			[]gt{{name: "a", dims: []uint64{8}, data: zeros(32)}, {name: "b", typ: 8, dims: []uint64{32}, data: zeros(34)}}), true}, // F32 + Q8_0
+		{"payload.gguf", append(gguf("w"), []byte("PK\x03\x04 a zip appended after the last tensor..")...), false},
+		{"gap.gguf", ggufFile(nil, []gt{{name: "a", dims: []uint64{8}, data: zeros(32)}, {name: "b", dims: []uint64{8}, data: zeros(32), skip: 32}}), false},
+		{"dupkey.gguf", ggufFile([][]byte{kvStr("k", "1"), kvStr("k", "2")}, []gt{{name: "w", dims: []uint64{1}, data: zeros(4)}}), false},
+		{"dupname.gguf", ggufFile(nil, []gt{{name: "w", dims: []uint64{1}, data: zeros(4)}, {name: "w", dims: []uint64{1}, data: zeros(4)}}), false},
+		{"align.gguf", ggufFile([][]byte{kvU32("general.alignment", 3)}, []gt{{name: "w", dims: []uint64{1}, data: zeros(4)}}), false},
+		{"type.gguf", ggufFile(nil, []gt{{name: "w", typ: 99, dims: []uint64{1}, data: zeros(4)}}), false},
+		{"blocks.gguf", ggufFile(nil, []gt{{name: "w", typ: 8, dims: []uint64{31}, data: zeros(34)}}), false}, // Q8_0 needs 32-element blocks
+		{"dims.gguf", ggufFile(nil, []gt{{name: "w", dims: []uint64{1, 1, 1, 1, 1}, data: zeros(4)}}), false},
+		{"hugekey.gguf", append(append(gguf("")[:24:24], binary.LittleEndian.AppendUint64(nil, 1<<40)...), 'x'), false}, // no 1 TB allocation
 		// safetensors layout: tensors must tile the data section exactly
 		{"gap.safetensors", safetensorsWith(`{"w":{"dtype":"U8","shape":[2],"data_offsets":[2,4]}}`, 0, zeros(4)), false},
 		{"overlap.safetensors", safetensorsWith(`{"a":{"dtype":"U8","shape":[4],"data_offsets":[0,4]},"b":{"dtype":"U8","shape":[2],"data_offsets":[2,4]}}`, 0, zeros(4)), false},
