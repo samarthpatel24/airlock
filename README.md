@@ -32,6 +32,15 @@ airlock verify ./bundle --key cosign.pub
 
 `airlock check ./bundle` runs only the format checks.
 
+After the model server starts, `airlock smoke` waits for `/health`, asks a question with a known answer through the OpenAI-compatible API, and appends the answer to the report. It works with llama.cpp and vLLM.
+
+```sh
+llama-server -m bundle/qwen2.5-0.5b-instruct-q4_k_m.gguf --port 8080 --offline
+airlock smoke --url http://127.0.0.1:8080
+```
+
+Tested end to end with Qwen2.5 0.5B Instruct (Q4_K_M, commit `9217f5db`): the live Hugging Face check, seal, verify, and a smoke test that answered "4".
+
 ### With Zarf
 
 ```sh
@@ -79,4 +88,4 @@ It does not cover:
 
 ## Status
 
-Not done yet: a smoke test that starts the model and sends it a prompt, an offline vulnerability re-scan with a bundled database, and updates that ship only changed files.
+Not done yet: an offline vulnerability re-scan with a bundled database, and updates that ship only changed files.
