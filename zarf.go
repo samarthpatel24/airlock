@@ -42,6 +42,9 @@ func zarfCmd(args []string) error {
 	if *key == "" {
 		return errors.New("--key is required")
 	}
+	if err := outside(dir, *out, "--out"); err != nil {
+		return err
+	}
 	if !zarfNameRe.MatchString(*name) {
 		return fmt.Errorf("--name %q: use lowercase letters, digits and '-'", *name)
 	}

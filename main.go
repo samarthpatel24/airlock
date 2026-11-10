@@ -8,23 +8,48 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
-// parseDir accepts the bundle dir before or after the flags.
+// parseDir accepts the bundle dir anywhere among the flags, and resolves
+// symlinks in its path (external drives are often reached through one).
 func parseDir(fs *flag.FlagSet, args []string) (string, error) {
-	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
-		fs.Parse(args[1:])
+	var pos []string
+	for {
+		if err := fs.Parse(args); err != nil {
+			return "", err
+		}
 		if fs.NArg() == 0 {
-			return args[0], nil
+			break
 		}
-	} else {
-		fs.Parse(args)
-		if fs.NArg() == 1 {
-			return fs.Arg(0), nil
-		}
+		pos = append(pos, fs.Arg(0))
+		args = fs.Args()[1:]
 	}
-	return "", errors.New("expected exactly one bundle directory")
+	if len(pos) != 1 {
+		return "", errors.New("expected exactly one bundle directory")
+	}
+	return filepath.EvalSymlinks(pos[0])
+}
+
+// outside refuses an output path inside the bundle: the file would show up
+// as unexpected and fail every later verify.
+func outside(dir, path, flagName string) error {
+	p, err := filepath.Abs(path)
+	if err != nil {
+		return err
+	}
+	if parent, err := filepath.EvalSymlinks(filepath.Dir(p)); err == nil {
+		p = filepath.Join(parent, filepath.Base(p))
+	}
+	d, err := filepath.Abs(dir)
+	if err != nil {
+		return err
+	}
+	if rel, err := filepath.Rel(d, p); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("%s %q is inside the bundle; write it somewhere else", flagName, path)
+	}
+	return nil
 }
 
 const version = "0.1.0"

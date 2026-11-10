@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"encoding/pem"
+	"flag"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -198,6 +199,46 @@ func TestSealVerifyTamper(t *testing.T) {
 	other, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	write(t, filepath.Join(bundle, signatureName), sign(t, other, mb))
 	expect("signed by someone else", "invalid signature")
+}
+
+func TestCLIPaths(t *testing.T) {
+	bundle, pub, _ := sealedBundle(t)
+	for _, args := range [][]string{
+		{bundle, "--key", pub},
+		{"--key", pub, bundle},
+		{"--key", pub, bundle, "--report", filepath.Join(t.TempDir(), "r.md")}, // flags on both sides
+		{"--key=" + pub, bundle},
+	} {
+		fs := flag.NewFlagSet("t", flag.ContinueOnError)
+		fs.String("key", "", "")
+		fs.String("report", "", "")
+		if _, err := parseDir(fs, args); err != nil {
+			t.Errorf("%v: %v", args, err)
+		}
+	}
+	for _, args := range [][]string{{}, {bundle, bundle}, {"--key", pub}} {
+		fs := flag.NewFlagSet("t", flag.ContinueOnError)
+		fs.String("key", "", "")
+		if _, err := parseDir(fs, args); err == nil {
+			t.Errorf("%v: accepted", args)
+		}
+	}
+
+	link := filepath.Join(t.TempDir(), "drive")
+	os.Symlink(bundle, link) // e.g. a bundle reached through /Volumes
+	if err := verify([]string{link, "--key", pub, "--report", filepath.Join(t.TempDir(), "r.md")}); err != nil {
+		t.Errorf("symlinked bundle dir: %v", err)
+	}
+
+	if err := verify([]string{bundle, "--key", pub, "--report", filepath.Join(bundle, "r.md")}); err == nil {
+		t.Error("report inside the bundle accepted")
+	}
+	if err := zarfCmd([]string{bundle, "--key", pub, "--out", filepath.Join(bundle, "zarf.yaml")}); err == nil {
+		t.Error("zarf.yaml inside the bundle accepted")
+	}
+	if _, err := os.Stat(filepath.Join(bundle, "r.md")); err == nil {
+		t.Error("report was written into the bundle")
+	}
 }
 
 func TestZarf(t *testing.T) {

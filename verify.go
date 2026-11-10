@@ -31,6 +31,9 @@ func verify(args []string) error {
 	if *key == "" {
 		return errors.New("--key is required")
 	}
+	if err := outside(dir, *out, "--report"); err != nil {
+		return err
+	}
 	r := report{Dir: dir}
 	err = doVerify(dir, *key, &r)
 	if werr := r.write(*out, err); werr != nil {
