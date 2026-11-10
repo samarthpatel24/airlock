@@ -80,12 +80,22 @@ func short(s string) string { return s[:min(len(s), 12)] }
 
 func zarfYAML(m *Manifest, dir, insideKey, insideBin, bin, name, base string) (string, error) {
 	// Source paths are relative to the zarf.yaml, as Zarf resolves them.
-	rel := func(p string) (string, error) {
+	real := func(p string) (string, error) { // resolve both sides alike, or paths detour through symlinks
 		a, err := filepath.Abs(p)
 		if err != nil {
 			return "", err
 		}
-		b, err := filepath.Abs(base)
+		if r, err := filepath.EvalSymlinks(a); err == nil {
+			return r, nil
+		}
+		return a, nil
+	}
+	rel := func(p string) (string, error) {
+		a, err := real(p)
+		if err != nil {
+			return "", err
+		}
+		b, err := real(base)
 		if err != nil {
 			return "", err
 		}
