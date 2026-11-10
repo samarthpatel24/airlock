@@ -137,7 +137,7 @@ func looksLikePickle(head []byte) bool {
 var (
 	hfBase   = "https://huggingface.co" // overridden in tests
 	commitRe = regexp.MustCompile(`^[0-9a-f]{40}$`)
-	repoRe   = regexp.MustCompile(`^[A-Za-z0-9][\w.-]*/[\w.-]+$`)
+	repoRe   = regexp.MustCompile(`^[A-Za-z0-9][\w.-]*/[A-Za-z0-9][\w.-]*$`) // no "." or ".." segments
 )
 
 type hfSibling struct {
@@ -158,7 +158,9 @@ func checkHF(dir, repo, rev string, files []FileEntry) error {
 		return fmt.Errorf("revision must be a full 40-char commit hash, got %q", rev)
 	}
 	u := fmt.Sprintf("%s/api/models/%s/revision/%s?blobs=true", hfBase, repo, url.PathEscape(rev))
-	client := http.Client{Timeout: 30 * time.Second}
+	client := http.Client{Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error {
+		return errors.New("redirect refused (repo renamed? use its current name)")
+	}}
 	resp, err := client.Get(u)
 	if err != nil {
 		return err

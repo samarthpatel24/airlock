@@ -203,6 +203,9 @@ func TestHFProvenance(t *testing.T) {
 	if err := checkHF(dir, "org/model", "main", files); err == nil {
 		t.Fatal("branch name accepted; must require a pinned commit")
 	}
+	if err := checkHF(dir, "org/..", rev, files); err == nil {
+		t.Fatal("dot segment accepted in repo name")
+	}
 	lfsSHA = strings.Repeat("0", 64)
 	if err := checkHF(dir, "org/model", rev, files); err == nil {
 		t.Fatal("weights with a different hash were accepted")
