@@ -12,7 +12,11 @@ import (
 	"strings"
 )
 
-var zarfNameRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
+var (
+	zarfNameRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
+	// The key path is written into a shell command, so only plain absolute paths.
+	keyPathRe = regexp.MustCompile(`^/[A-Za-z0-9._/-]+$`)
+)
 
 // zarfCmd writes a Zarf component that carries a sealed bundle into the
 // air gap and runs `airlock verify` there at deploy time. Zarf deploys
@@ -26,7 +30,7 @@ var zarfNameRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
 func zarfCmd(args []string) error {
 	fs := flag.NewFlagSet("zarf", flag.ExitOnError)
 	key := fs.String("key", "", "cosign public key, to verify the bundle now (required; not shipped)")
-	insideKey := fs.String("inside-key", "/etc/airlock/cosign.pub", "path of the trusted key on the deploy host (Zarf variable AIRLOCK_KEY)")
+	insideKey := fs.String("inside-key", "/etc/airlock/cosign.pub", "absolute path of the trusted key on the deploy host")
 	bin := fs.String("bin", "", "optional: ship this airlock binary (only safe if the Zarf package signature is verified at deploy)")
 	name := fs.String("name", "airlock-model", "Zarf package name")
 	out := fs.String("out", "zarf.yaml", "where to write the Zarf package config")
@@ -42,6 +46,9 @@ func zarfCmd(args []string) error {
 	}
 	if !zarfNameRe.MatchString(*name) {
 		return fmt.Errorf("--name %q: use lowercase letters, digits and '-'", *name)
+	}
+	if !keyPathRe.MatchString(*insideKey) {
+		return fmt.Errorf("--inside-key %q: must be a plain absolute path", *insideKey)
 	}
 
 	// Never package something that would fail inside.
@@ -84,9 +91,9 @@ func zarfYAML(m *Manifest, dir, insideKey, bin, name, base string) (string, erro
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(&b, "      - source: %s\n        target: %s\n", q(s), q(target))
+		fmt.Fprintf(&b, "      - source: %s\n        destination: %s\n", q(s), q(target))
 		if shasum != "" {
-			fmt.Fprintf(&b, "        shasum: %s\n", shasum)
+			fmt.Fprintf(&b, "        checksum: sha256:%s\n", shasum)
 		}
 		if exec {
 			b.WriteString("        executable: true\n")
@@ -98,9 +105,8 @@ func zarfYAML(m *Manifest, dir, insideKey, bin, name, base string) (string, erro
 	if m.Model != nil {
 		desc = fmt.Sprintf("%s@%s, verified offline by airlock", m.Model.Repo, m.Model.Revision[:12])
 	}
-	fmt.Fprintf(&b, "kind: ZarfPackageConfig\nmetadata:\n  name: %s\n  description: %s\n  version: %s\n", name, q(desc), q(version))
-	fmt.Fprintf(&b, "variables:\n  - name: AIRLOCK_KEY\n    description: \"Trusted airlock public key, installed on this host out of band\"\n    default: %s\n", q(insideKey))
-	b.WriteString("components:\n  - name: airlock-verify\n    required: true\n")
+	fmt.Fprintf(&b, "apiVersion: zarf.dev/v1beta1\nkind: ZarfPackageConfig\nmetadata:\n  name: %s\n  description: %s\n  version: %s\n", name, q(desc), q(version))
+	b.WriteString("components:\n  - name: airlock-verify\n") // v1beta1 components are required by default
 	b.WriteString("    description: \"Verify the model bundle before anything after this component deploys\"\n    files:\n")
 
 	verifier := "airlock" // pre-installed, trusted copy on the deploy host
@@ -123,8 +129,8 @@ func zarfYAML(m *Manifest, dir, insideKey, bin, name, base string) (string, erro
 			return "", err
 		}
 	}
-	b.WriteString("    actions:\n      onDeploy:\n        after:\n")
-	fmt.Fprintf(&b, "          - cmd: %s verify ./airlock/bundle --key \"${ZARF_VAR_AIRLOCK_KEY}\" --report ./airlock/airlock-report.md\n", verifier)
+	b.WriteString("    actions:\n      onDeploy:\n        onSuccess:\n")
+	fmt.Fprintf(&b, "          - cmd: %s verify ./airlock/bundle --key %s --report ./airlock/airlock-report.md\n", verifier, insideKey)
 	b.WriteString("            description: \"airlock: verify signature, hashes and formats offline\"\n")
 	return b.String(), nil
 }

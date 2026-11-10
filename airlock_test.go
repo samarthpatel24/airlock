@@ -150,19 +150,21 @@ func TestZarf(t *testing.T) {
 	y, _ := os.ReadFile(out)
 	sum, _, _ := hashFile(filepath.Join(bundle, "model.gguf"))
 	for _, want := range []string{
-		"kind: ZarfPackageConfig",
-		`target: "airlock/bundle/tok/config.json"`,
-		"shasum: " + sum,
-		`target: "airlock/bundle/manifest.sigstore.json"`,
-		`- cmd: airlock verify ./airlock/bundle --key "${ZARF_VAR_AIRLOCK_KEY}"`,
-		`default: "/etc/airlock/cosign.pub"`,
+		"apiVersion: zarf.dev/v1beta1",
+		`destination: "airlock/bundle/tok/config.json"`,
+		"checksum: sha256:" + sum,
+		`destination: "airlock/bundle/manifest.sigstore.json"`,
+		"- cmd: airlock verify ./airlock/bundle --key /etc/airlock/cosign.pub",
 	} {
 		if !strings.Contains(string(y), want) {
 			t.Errorf("zarf.yaml missing %q", want)
 		}
 	}
-	if strings.Contains(string(y), "cosign.pub\"\n        target") || strings.Contains(string(y), "bin/airlock") {
+	if strings.Contains(string(y), "cosign.pub\"\n        destination") || strings.Contains(string(y), "bin/airlock") {
 		t.Error("trust anchors (key or verifier) shipped by default")
+	}
+	if err := zarfCmd([]string{bundle, "--key", pub, "--out", out, "--inside-key", "/k; rm -rf /"}); err == nil {
+		t.Error("shell metacharacters accepted in --inside-key")
 	}
 
 	if err := zarfCmd([]string{bundle, "--key", pub, "--bin", bin, "--out", out}); err != nil {
