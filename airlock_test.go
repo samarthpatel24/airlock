@@ -190,13 +190,13 @@ func TestZarf(t *testing.T) {
 		`destination: "airlock/bundle/tok/config.json"`,
 		"checksum: sha256:" + sum,
 		`destination: "airlock/bundle/manifest.sigstore.json"`,
-		"- cmd: airlock verify ./airlock/bundle --key /etc/airlock/cosign.pub",
+		"- cmd: /usr/local/bin/airlock verify ./airlock/bundle --key /etc/airlock/cosign.pub",
 	} {
 		if !strings.Contains(string(y), want) {
 			t.Errorf("zarf.yaml missing %q", want)
 		}
 	}
-	if strings.Contains(string(y), "cosign.pub\"\n        destination") || strings.Contains(string(y), "bin/airlock") {
+	if strings.Contains(string(y), "cosign.pub\"\n        destination") || strings.Contains(string(y), `destination: "airlock/bin/airlock"`) {
 		t.Error("trust anchors (key or verifier) shipped by default")
 	}
 	if err := zarfCmd([]string{bundle, "--key", pub, "--out", out, "--inside-key", "/k; rm -rf /"}); err == nil {

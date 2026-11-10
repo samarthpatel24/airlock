@@ -31,7 +31,8 @@ func zarfCmd(args []string) error {
 	fs := flag.NewFlagSet("zarf", flag.ExitOnError)
 	key := fs.String("key", "", "cosign public key, to verify the bundle now (required; not shipped)")
 	insideKey := fs.String("inside-key", "/etc/airlock/cosign.pub", "absolute path of the trusted key on the deploy host")
-	bin := fs.String("bin", "", "optional: ship this airlock binary (only safe if the Zarf package signature is verified at deploy)")
+	insideBin := fs.String("inside-bin", "/usr/local/bin/airlock", "absolute path of the trusted airlock on the deploy host")
+	bin := fs.String("bin", "", "optional: ship this airlock binary instead of using --inside-bin")
 	name := fs.String("name", "airlock-model", "Zarf package name")
 	out := fs.String("out", "zarf.yaml", "where to write the Zarf package config")
 	dir, err := parseDir(fs, args)
@@ -41,14 +42,13 @@ func zarfCmd(args []string) error {
 	if *key == "" {
 		return errors.New("--key is required")
 	}
-	if *bin != "" {
-		fmt.Println("! shipping the verifier inside the package: deploy with Zarf signature verification (zarf package deploy --key)")
-	}
 	if !zarfNameRe.MatchString(*name) {
 		return fmt.Errorf("--name %q: use lowercase letters, digits and '-'", *name)
 	}
-	if !keyPathRe.MatchString(*insideKey) {
-		return fmt.Errorf("--inside-key %q: must be a plain absolute path", *insideKey)
+	for flagName, p := range map[string]string{"--inside-key": *insideKey, "--inside-bin": *insideBin} {
+		if !keyPathRe.MatchString(p) {
+			return fmt.Errorf("%s %q: must be a plain absolute path", flagName, p)
+		}
 	}
 
 	// Never package something that would fail inside.
@@ -56,20 +56,26 @@ func zarfCmd(args []string) error {
 	if err := doVerify(dir, *key, &r); err != nil {
 		return fmt.Errorf("bundle does not verify, refusing to package: %w", err)
 	}
-	y, err := zarfYAML(r.M, dir, *insideKey, *bin, *name, filepath.Dir(*out))
+	y, err := zarfYAML(r.M, dir, *insideKey, *insideBin, *bin, *name, filepath.Dir(*out))
 	if err != nil {
 		return err
 	}
 	if err := os.WriteFile(*out, []byte(y), 0o644); err != nil {
 		return err
 	}
+	// The verify step lives in the package, so an unsigned package lets anyone
+	// in transit delete it. Zarf's own signature closes that hole.
 	fmt.Printf("✔ bundle verified, wrote %s\n", *out)
-	fmt.Printf("  inside host must already hold the trusted key at %s\n", *insideKey)
-	fmt.Println("  next: zarf package create", filepath.Dir(*out), " — or import it from your own zarf.yaml")
+	fmt.Printf("  the deploy host must already have %s and the trusted key at %s\n", *insideBin, *insideKey)
+	fmt.Println("  sign the package, or the verify step can be removed in transit:")
+	fmt.Printf("    zarf package create %s --signing-key cosign.key\n", filepath.Dir(*out))
+	fmt.Printf("    zarf package deploy <package> --key %s --verify=always\n", *insideKey)
 	return nil
 }
 
-func zarfYAML(m *Manifest, dir, insideKey, bin, name, base string) (string, error) {
+func short(s string) string { return s[:min(len(s), 12)] }
+
+func zarfYAML(m *Manifest, dir, insideKey, insideBin, bin, name, base string) (string, error) {
 	// Source paths are relative to the zarf.yaml, as Zarf resolves them.
 	rel := func(p string) (string, error) {
 		a, err := filepath.Abs(p)
@@ -103,13 +109,13 @@ func zarfYAML(m *Manifest, dir, insideKey, bin, name, base string) (string, erro
 
 	desc := "AI model bundle verified offline by airlock"
 	if m.Model != nil {
-		desc = fmt.Sprintf("%s@%s, verified offline by airlock", m.Model.Repo, m.Model.Revision[:12])
+		desc = fmt.Sprintf("%s@%s, verified offline by airlock", m.Model.Repo, short(m.Model.Revision))
 	}
 	fmt.Fprintf(&b, "apiVersion: zarf.dev/v1beta1\nkind: ZarfPackageConfig\nmetadata:\n  name: %s\n  description: %s\n  version: %s\n", name, q(desc), q(version))
 	b.WriteString("components:\n  - name: airlock-verify\n") // v1beta1 components are required by default
 	b.WriteString("    description: \"Verify the model bundle before anything after this component deploys\"\n    files:\n")
 
-	verifier := "airlock" // pre-installed, trusted copy on the deploy host
+	verifier := insideBin // pre-installed, trusted copy on the deploy host
 	if bin != "" {
 		if err := file(bin, "airlock/bin/airlock", "", true); err != nil {
 			return "", err
