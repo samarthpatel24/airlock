@@ -1,0 +1,208 @@
+package main
+
+import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/binary"
+	"encoding/json"
+	"encoding/pem"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func write(t *testing.T, path string, data []byte) {
+	t.Helper()
+	os.MkdirAll(filepath.Dir(path), 0o755)
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func safetensors() []byte {
+	hdr := []byte(`{"w":{"dtype":"F32","shape":[1],"data_offsets":[0,4]}}`)
+	b := binary.LittleEndian.AppendUint64(nil, uint64(len(hdr)))
+	return append(append(b, hdr...), 0, 0, 0, 0)
+}
+
+func TestFormats(t *testing.T) {
+	dir := t.TempDir()
+	cases := []struct {
+		name string
+		data []byte
+		ok   bool
+	}{
+		{"model.gguf", []byte("GGUF\x03\x00\x00\x00rest"), true},
+		{"model.safetensors", safetensors(), true},
+		{"config.json", []byte(`{"a":1}`), true},
+		{"pytorch_model.bin", []byte("anything"), false},                   // pickle extension
+		{"config2.json", []byte("\x80\x04\x95pickle"), false},              // renamed pickle
+		{"config3.json", []byte("(dp0\nS'a'\np1\n."), false},               // renamed ASCII pickle
+		{"model2.safetensors", []byte("PK\x03\x04zip-with-pickle"), false}, // torch.save zip
+		{"fake.gguf", []byte("NOPE1234"), false},                           // wrong header
+		{"bad.safetensors", []byte("\xff\xff\xff\xff\xff\xff\xff\x7f"), false},
+		{"run.sh", []byte("#!/bin/sh"), false}, // unknown format
+	}
+	for _, c := range cases {
+		p := filepath.Join(dir, c.name)
+		write(t, p, c.data)
+		_, err := checkModelFile(p, int64(len(c.data)))
+		if (err == nil) != c.ok {
+			t.Errorf("%s: ok=%v, err=%v", c.name, c.ok, err)
+		}
+	}
+}
+
+// sign mimics `cosign sign-blob --key ... --bundle` output.
+func sign(t *testing.T, k *ecdsa.PrivateKey, msg []byte) []byte {
+	d := sha256.Sum256(msg)
+	sig, err := ecdsa.SignASN1(rand.Reader, k, d[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var b sigBundle
+	b.MediaType = "application/vnd.dev.sigstore.bundle.v0.3+json"
+	b.MessageSignature.MessageDigest.Algorithm = "SHA2_256"
+	b.MessageSignature.MessageDigest.Digest = d[:]
+	b.MessageSignature.Signature = sig
+	out, _ := json.Marshal(b)
+	return out
+}
+
+func pubPEM(t *testing.T, dir string, k *ecdsa.PrivateKey) string {
+	der, _ := x509.MarshalPKIXPublicKey(&k.PublicKey)
+	p := filepath.Join(dir, "cosign.pub")
+	write(t, p, pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: der}))
+	return p
+}
+
+// sealedBundle builds a small signed bundle the way `airlock seal` does.
+func sealedBundle(t *testing.T) (bundle, pub string, mb []byte) {
+	keys := t.TempDir()
+	bundle = t.TempDir()
+	k, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	pub = pubPEM(t, keys, k)
+	write(t, filepath.Join(bundle, "model.gguf"), []byte("GGUF\x03weights"))
+	write(t, filepath.Join(bundle, "tok/config.json"), []byte(`{}`))
+	files, err := listFiles(bundle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeJSON(filepath.Join(bundle, manifestName), &Manifest{Version: 1, Files: files})
+	mb, _ = os.ReadFile(filepath.Join(bundle, manifestName))
+	write(t, filepath.Join(bundle, signatureName), sign(t, k, mb))
+	return bundle, pub, mb
+}
+
+func TestSealVerifyTamper(t *testing.T) {
+	bundle, pub, mb := sealedBundle(t)
+
+	expect := func(label, want string) {
+		t.Helper()
+		err := doVerify(bundle, pub, &report{})
+		if want == "" && err != nil {
+			t.Fatalf("%s: unexpected error %v", label, err)
+		}
+		if want != "" && (err == nil || !strings.Contains(err.Error(), want)) {
+			t.Fatalf("%s: want error containing %q, got %v", label, want, err)
+		}
+	}
+	expect("clean bundle", "")
+
+	write(t, filepath.Join(bundle, "model.gguf"), []byte("GGUF\x03WEIGHTS"))
+	expect("changed weights", "hash mismatch")
+	write(t, filepath.Join(bundle, "model.gguf"), []byte("GGUF\x03weights"))
+
+	write(t, filepath.Join(bundle, "extra.json"), []byte(`{}`))
+	expect("extra file", "unexpected file")
+	os.Remove(filepath.Join(bundle, "extra.json"))
+
+	os.Symlink("/etc/passwd", filepath.Join(bundle, "link.json"))
+	expect("symlink", "symlinks are refused")
+	os.Remove(filepath.Join(bundle, "link.json"))
+
+	write(t, filepath.Join(bundle, manifestName), append(mb, ' '))
+	expect("edited manifest", "tampered")
+	write(t, filepath.Join(bundle, manifestName), mb)
+
+	other, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	write(t, filepath.Join(bundle, signatureName), sign(t, other, mb))
+	expect("signed by someone else", "invalid signature")
+}
+
+func TestZarf(t *testing.T) {
+	bundle, pub, _ := sealedBundle(t)
+	out := filepath.Join(t.TempDir(), "pkg", "zarf.yaml")
+	os.MkdirAll(filepath.Dir(out), 0o755)
+	bin := filepath.Join(t.TempDir(), "airlock")
+	write(t, bin, []byte("binary"))
+
+	if err := zarfCmd([]string{bundle, "--key", pub, "--out", out}); err != nil {
+		t.Fatal(err)
+	}
+	y, _ := os.ReadFile(out)
+	sum, _, _ := hashFile(filepath.Join(bundle, "model.gguf"))
+	for _, want := range []string{
+		"kind: ZarfPackageConfig",
+		`target: "airlock/bundle/tok/config.json"`,
+		"shasum: " + sum,
+		`target: "airlock/bundle/manifest.sigstore.json"`,
+		`- cmd: airlock verify ./airlock/bundle --key "${ZARF_VAR_AIRLOCK_KEY}"`,
+		`default: "/etc/airlock/cosign.pub"`,
+	} {
+		if !strings.Contains(string(y), want) {
+			t.Errorf("zarf.yaml missing %q", want)
+		}
+	}
+	if strings.Contains(string(y), "cosign.pub\"\n        target") || strings.Contains(string(y), "bin/airlock") {
+		t.Error("trust anchors (key or verifier) shipped by default")
+	}
+
+	if err := zarfCmd([]string{bundle, "--key", pub, "--bin", bin, "--out", out}); err != nil {
+		t.Fatal(err)
+	}
+	if y, _ := os.ReadFile(out); !strings.Contains(string(y), "- cmd: ./airlock/bin/airlock verify") {
+		t.Error("--bin did not switch to the shipped verifier")
+	}
+
+	write(t, filepath.Join(bundle, "model.gguf"), []byte("GGUF\x03evil"))
+	if err := zarfCmd([]string{bundle, "--key", pub, "--out", out}); err == nil {
+		t.Fatal("tampered bundle was packaged")
+	}
+}
+
+func TestHFProvenance(t *testing.T) {
+	dir := t.TempDir()
+	weights, cfg := []byte("GGUF\x03weights"), []byte(`{"x":1}`)
+	write(t, filepath.Join(dir, "m.gguf"), weights)
+	write(t, filepath.Join(dir, "config.json"), cfg)
+	files, _ := listFiles(dir)
+	rev := strings.Repeat("a", 40)
+	blob, _ := gitBlobSHA1(filepath.Join(dir, "config.json"))
+
+	lfsSHA := fmt.Sprintf("%x", sha256.Sum256(weights))
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, `{"sha":%q,"siblings":[{"rfilename":"config.json","blobId":%q},{"rfilename":"m.gguf","lfs":{"sha256":%q}}]}`,
+			rev, blob, lfsSHA)
+	}))
+	defer srv.Close()
+	hfBase = srv.URL
+
+	if err := checkHF(dir, "org/model", rev, files); err != nil {
+		t.Fatalf("genuine files rejected: %v", err)
+	}
+	if err := checkHF(dir, "org/model", "main", files); err == nil {
+		t.Fatal("branch name accepted; must require a pinned commit")
+	}
+	lfsSHA = strings.Repeat("0", 64)
+	if err := checkHF(dir, "org/model", rev, files); err == nil {
+		t.Fatal("weights with a different hash were accepted")
+	}
+}
