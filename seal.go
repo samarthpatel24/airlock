@@ -25,7 +25,7 @@ func seal(args []string) error {
 		return errors.New("--key is required")
 	}
 
-	files, err := listFiles(dir)
+	files, err := listFiles(dir, nil)
 	if err != nil {
 		return err
 	}

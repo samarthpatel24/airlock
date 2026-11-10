@@ -44,7 +44,7 @@ func checkCmd(args []string) error {
 	if fs.NArg() != 1 {
 		return errors.New("usage: airlock check <dir>")
 	}
-	files, err := listFiles(fs.Arg(0))
+	files, err := listFiles(fs.Arg(0), nil)
 	if err != nil {
 		return err
 	}
@@ -76,30 +76,33 @@ func (c *countingReader) Read(p []byte) (int, error) {
 }
 
 // inspect reads a file exactly once: the bytes that pass the format check
-// are the same bytes that get hashed.
-func inspect(path string) (sum string, size int64, kind string, err error) {
+// are the same bytes that get hashed (SHA-256 for the manifest, git's SHA-1
+// blob id for the Hugging Face check). Path is left for the caller to set.
+func inspect(path string) (FileEntry, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return "", 0, "", err
+		return FileEntry{}, err
 	}
 	defer f.Close()
 	st, err := f.Stat()
 	if err != nil {
-		return "", 0, "", err
+		return FileEntry{}, err
 	}
-	h := sha256.New()
+	h, g := sha256.New(), sha1.New()
+	fmt.Fprintf(g, "blob %d\x00", st.Size())
+	w := io.MultiWriter(h, g)
 	cr := &countingReader{r: f}
-	kind, err = checkFormat(io.TeeReader(cr, h), filepath.Base(path), st.Size())
+	kind, err := checkFormat(io.TeeReader(cr, w), filepath.Base(path), st.Size())
 	if err != nil {
-		return "", 0, "", err
+		return FileEntry{}, err
 	}
-	if _, err := io.Copy(h, cr); err != nil {
-		return "", 0, "", err
+	if _, err := io.Copy(w, cr); err != nil {
+		return FileEntry{}, err
 	}
 	if cr.n != st.Size() {
-		return "", 0, "", errors.New("file changed while being read")
+		return FileEntry{}, errors.New("file changed while being read")
 	}
-	return hex.EncodeToString(h.Sum(nil)), cr.n, kind, nil
+	return FileEntry{Size: cr.n, SHA256: hex.EncodeToString(h.Sum(nil)), Kind: kind, GitSHA1: hex.EncodeToString(g.Sum(nil))}, nil
 }
 
 // checkFormat returns "weights" or "meta", or an error for pickle-based or
@@ -340,32 +343,9 @@ func checkHF(dir, repo, rev string, files []FileEntry) error {
 		}
 		// ponytail: small non-LFS files are matched by git's SHA-1 blob id, the
 		// only hash HF publishes for them; fetch and sha256 them if that matters.
-		sum, err := gitBlobSHA1(filepath.Join(dir, filepath.FromSlash(f.Path)))
-		if err != nil {
-			return err
-		}
-		if sum != s.BlobID {
+		if f.GitSHA1 != s.BlobID {
 			return fmt.Errorf("%q: git blob hash differs from upstream", f.Path)
 		}
 	}
 	return nil
-}
-
-// gitBlobSHA1 is how git names small (non-LFS) files: sha1("blob <len>\0" + data).
-func gitBlobSHA1(path string) (string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-	st, err := f.Stat()
-	if err != nil {
-		return "", err
-	}
-	h := sha1.New()
-	fmt.Fprintf(h, "blob %d\x00", st.Size())
-	if _, err := io.Copy(h, f); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(h.Sum(nil)), nil
 }

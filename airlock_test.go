@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/binary"
@@ -98,7 +99,7 @@ func TestFormats(t *testing.T) {
 	for _, c := range cases {
 		p := filepath.Join(dir, c.name)
 		write(t, p, c.data)
-		_, _, _, err := inspect(p)
+		_, err := inspect(p)
 		if (err == nil) != c.ok {
 			t.Errorf("%s: ok=%v, err=%v", c.name, c.ok, err)
 		}
@@ -136,7 +137,7 @@ func sealedBundle(t *testing.T) (bundle, pub string, mb []byte) {
 	pub = pubPEM(t, keys, k)
 	write(t, filepath.Join(bundle, "model.gguf"), gguf("weights"))
 	write(t, filepath.Join(bundle, "tok/config.json"), []byte(`{}`))
-	files, err := listFiles(bundle)
+	files, err := listFiles(bundle, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -362,9 +363,9 @@ func TestHFProvenance(t *testing.T) {
 	weights, cfg := gguf("weights"), []byte(`{"x":1}`)
 	write(t, filepath.Join(dir, "m.gguf"), weights)
 	write(t, filepath.Join(dir, "config.json"), cfg)
-	files, _ := listFiles(dir)
+	files, _ := listFiles(dir, nil)
 	rev := strings.Repeat("a", 40)
-	blob, _ := gitBlobSHA1(filepath.Join(dir, "config.json"))
+	blob := fmt.Sprintf("%x", sha1.Sum(append([]byte(fmt.Sprintf("blob %d\x00", len(cfg))), cfg...))) // computed independently of the code
 
 	lfsSHA := fmt.Sprintf("%x", sha256.Sum256(weights))
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

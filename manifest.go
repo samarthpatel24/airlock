@@ -38,10 +38,11 @@ type ModelInfo struct {
 }
 
 type FileEntry struct {
-	Path   string `json:"path"`
-	Size   int64  `json:"size"`
-	SHA256 string `json:"sha256"`
-	Kind   string `json:"-"` // "weights" or "meta", set when read from disk
+	Path    string `json:"path"`
+	Size    int64  `json:"size"`
+	SHA256  string `json:"sha256"`
+	Kind    string `json:"-"` // "weights" or "meta", set when read from disk
+	GitSHA1 string `json:"-"` // git blob id, for the Hugging Face check
 }
 
 func hashFile(path string) (string, int64, error) {
@@ -57,8 +58,9 @@ func hashFile(path string) (string, int64, error) {
 
 // listFiles format-checks and hashes every file under dir (one read each),
 // except airlock's own manifest and signature. Symlinks and other
-// non-regular files are rejected outright.
-func listFiles(dir string) ([]FileEntry, error) {
+// non-regular files are rejected outright. With want (a signed manifest), a
+// file that is unlisted or the wrong size fails before its content is parsed.
+func listFiles(dir string, want map[string]FileEntry) ([]FileEntry, error) {
 	var out []FileEntry
 	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
@@ -74,11 +76,21 @@ func listFiles(dir string) ([]FileEntry, error) {
 		if !d.Type().IsRegular() {
 			return fmt.Errorf("%q: not a regular file (symlinks are refused)", rel)
 		}
-		sum, size, kind, err := inspect(p)
+		if want != nil {
+			w, ok := want[filepath.ToSlash(rel)]
+			if !ok {
+				return fmt.Errorf("unexpected file not in manifest: %q", rel)
+			}
+			if info, err := d.Info(); err != nil || info.Size() != w.Size {
+				return fmt.Errorf("hash mismatch: %q (tampered or corrupted)", rel)
+			}
+		}
+		e, err := inspect(p)
 		if err != nil {
 			return fmt.Errorf("%q: %w", rel, err)
 		}
-		out = append(out, FileEntry{Path: filepath.ToSlash(rel), Size: size, SHA256: sum, Kind: kind})
+		e.Path = filepath.ToSlash(rel)
+		out = append(out, e)
 		return nil
 	})
 	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })
@@ -89,13 +101,13 @@ func listFiles(dir string) ([]FileEntry, error) {
 // no missing files, no extra files, same sizes and hashes. It returns what it
 // read from disk.
 func checkFiles(dir string, m *Manifest) ([]FileEntry, error) {
-	onDisk, err := listFiles(dir)
-	if err != nil {
-		return nil, err
-	}
 	want := map[string]FileEntry{}
 	for _, f := range m.Files {
 		want[f.Path] = f
+	}
+	onDisk, err := listFiles(dir, want)
+	if err != nil {
+		return nil, err
 	}
 	for _, f := range onDisk {
 		w, ok := want[f.Path]
