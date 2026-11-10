@@ -8,7 +8,7 @@ Moving the files is left to Zarf or a USB drive. airlock refuses file formats th
 
 When sealing (online):
 
-- Weights must be GGUF or safetensors. GGUF needs a v2 or v3 header that declares at least one tensor; the rest of the file is not parsed. For safetensors, every tensor's size must match its dtype and shape, and the tensors must sit back to back from byte 0 to the end of the file, so no bytes can hide between or after them. Duplicate tensor names and unknown dtypes are refused.
+- Weights must be GGUF (v2 or v3) or safetensors. Both are parsed in full up to the tensor data: every tensor's size must match its type and shape, and the tensors must fill the data section to the end of the file, with only GGUF's alignment padding between them. No bytes can hide between or after them. Duplicate metadata keys or tensor names, unknown types, and fields that are too long or run past the end of the file are refused.
 - Pickle extensions (`.bin`, `.pt`, `.ckpt` and similar) are refused. Metadata files are checked by content: `.json` must parse, `.model` must start like a sentencepiece file, and text files (`.txt`, `.md`, `.jinja`, `LICENSE`, `NOTICE`, `.gitattributes`) must be UTF-8 with no NUL bytes. Binary pickles and zip archives are refused under any of these names. Unknown file types, symlinks, and file names with control characters, backticks, `|` or `:` are refused.
 - With `--hf` and `--rev`, every file must match the upstream repo at that commit. Branch names are refused because they can move.
 - With `--clamav`, a ClamAV scan runs. It is off by default because the scanner and its database are one more downloaded thing to trust. If you ask for it and it can't run, sealing fails.
@@ -82,7 +82,7 @@ It does not cover:
 - A malicious upstream commit. Pinning stops later changes to the repo, but if the pinned commit is bad, airlock accepts it.
 - Rollback. An older bundle signed by the same key still verifies. Rotate keys or track versions on the offline side if that matters.
 - Chat templates. Jinja templates, in `.jinja` files, in `tokenizer_config.json` or inside GGUF metadata, are not inspected. Use a loader that renders them in a sandbox (see CVE-2024-34359).
-- Deep format checks. GGUF metadata is not parsed, the `.model` check reads only the first byte, and a protocol-0 (plain text) pickle inside a `.txt` file is not detected. Loaders choose a parser by file name, so these files are not unpickled, but a loader that sniffs content could treat them differently.
+- Metadata values and tensor bytes. GGUF metadata values are read but not judged, tensor bytes are arbitrary data in any format, the `.model` check reads only the first byte, and a protocol-0 (plain text) pickle inside a `.txt` file is not detected. Loaders choose a parser by file name, so these files are not unpickled, but a loader that sniffs content could treat them differently.
 - A compromised online machine. Seal trusts the machine it runs on. Someone who can write to the bundle while it is being sealed could change files before they are signed.
 - Small upstream files. Hugging Face publishes only a git SHA-1 for non-LFS files, so those are matched by SHA-1. Weights are LFS files and are matched by SHA-256.
 - Transparency logs. Signatures are key-based only, because air-gapped sites usually cannot reach Rekor.
