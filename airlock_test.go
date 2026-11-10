@@ -107,7 +107,9 @@ func TestFormats(t *testing.T) {
 }
 
 // sign mimics `cosign sign-blob --key ... --bundle` output.
-func sign(t *testing.T, k *ecdsa.PrivateKey, msg []byte) []byte {
+func newKey() *ecdsa.PrivateKey { k, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader); return k }
+
+func sign(t testing.TB, k *ecdsa.PrivateKey, msg []byte) []byte {
 	d := sha256.Sum256(msg)
 	sig, err := ecdsa.SignASN1(rand.Reader, k, d[:])
 	if err != nil {
