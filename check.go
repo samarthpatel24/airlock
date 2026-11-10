@@ -234,7 +234,7 @@ func checkHF(dir, repo, rev string, files []FileEntry) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("hugging face: %s", resp.Status)
+		return fmt.Errorf("hugging face: HTTP %d", resp.StatusCode) // never the server's status text
 	}
 	var info struct {
 		SHA      string      `json:"sha"`

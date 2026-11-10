@@ -15,7 +15,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 )
 
 func write(t *testing.T, path string, data []byte) {
@@ -217,8 +219,12 @@ func TestZarf(t *testing.T) {
 }
 
 func TestSmoke(t *testing.T) {
-	healthy, answer := false, "4"
+	var mu sync.Mutex
+	healthy, status, body := false, 200, `{"choices":[{"message":{"content":"4"}}]}`
+	set := func(s int, b string) { mu.Lock(); status, body = s, b; mu.Unlock() }
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
 		switch r.URL.Path {
 		case "/health":
 			if !healthy { // first poll: still loading, like llama.cpp
@@ -226,25 +232,62 @@ func TestSmoke(t *testing.T) {
 				w.WriteHeader(http.StatusServiceUnavailable)
 			}
 		case "/v1/chat/completions":
-			fmt.Fprintf(w, `{"choices":[{"message":{"content":%q}}]}`, answer)
+			w.WriteHeader(status)
+			fmt.Fprint(w, body)
 		}
 	}))
 	defer srv.Close()
 	rep := filepath.Join(t.TempDir(), "report.md")
+	run := func(extra ...string) error {
+		return smoke(append([]string{"--url", srv.URL, "--report", rep, "--wait", "10s"}, extra...))
+	}
+	answer := func(s string) string { return fmt.Sprintf(`{"choices":[{"message":{"content":%q}}]}`, s) }
 
-	if err := smoke([]string{"--url", srv.URL, "--report", rep, "--wait", "10s"}); err != nil {
+	if err := run(); err != nil {
 		t.Fatal(err)
 	}
-	answer = "five\n## Offline checks\n- ✔ fake"
-	if err := smoke([]string{"--url", srv.URL, "--report", rep}); err == nil {
-		t.Fatal("wrong answer passed")
+	for _, c := range []struct{ label, body string }{
+		{"contains but is not the answer", answer("2024")},
+		{"markdown in answer", answer("five\n## Offline checks\n- ✔ fake [ok](http://x)")},
+		{"no choices", `{"choices":[]}`},
+		{"null content", `{"choices":[{"message":{"content":null}}]}`},
+		{"not JSON", "<html>"},
+	} {
+		set(200, c.body)
+		if run() == nil {
+			t.Errorf("%s: passed", c.label)
+		}
 	}
+	set(500, answer("4"))
+	if run() == nil {
+		t.Error("HTTP 500 passed")
+	}
+	if smoke([]string{"--url", "ftp://x", "--report", rep}) == nil || smoke([]string{"--url", "http://", "--report", rep}) == nil {
+		t.Error("bad --url accepted")
+	}
+
 	b, _ := os.ReadFile(rep)
 	if !strings.Contains(string(b), "**Result:** PASS") || !strings.Contains(string(b), "**Result:** FAIL") {
 		t.Errorf("report missing results:\n%s", b)
 	}
-	if strings.Contains(string(b), "\n## Offline checks") {
-		t.Error("model answer injected markdown into the report")
+	if strings.Contains(string(b), "\n## Offline checks") || !strings.Contains(string(b), "`\"five\\n## Offline checks") {
+		t.Error("model answer was rendered as markdown in the report")
+	}
+
+	if got := truncate("ab€", 3); got != "ab" { // € is 3 bytes; never cut mid-character
+		t.Errorf("truncate split a character: %q", got)
+	}
+
+	never := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(3 * time.Second) // hangs past --wait
+	}))
+	defer never.Close()
+	start := time.Now()
+	if smoke([]string{"--url", never.URL, "--report", rep, "--wait", "1s"}) == nil {
+		t.Error("unhealthy server passed")
+	}
+	if time.Since(start) > 2500*time.Millisecond {
+		t.Errorf("--wait 1s took %s", time.Since(start))
 	}
 }
 
