@@ -36,6 +36,8 @@ const usage = `airlock ` + version + ` — safety gate for AI models entering ai
   airlock verify <dir> --key cosign.pub     check signature, hashes, formats (offline side)
   airlock zarf   <dir> --key cosign.pub --bin <airlock-for-target>
                                             write a Zarf component that re-verifies at deploy
+  airlock smoke  [--url http://127.0.0.1:8080]
+                                            ask the running model a known question, add to report
 
 Run "airlock <command> -h" for flags.`
 
@@ -54,6 +56,8 @@ func main() {
 		err = verify(os.Args[2:])
 	case "zarf":
 		err = zarfCmd(os.Args[2:])
+	case "smoke":
+		err = smoke(os.Args[2:])
 	case "version":
 		fmt.Println(version)
 	default:

@@ -216,6 +216,38 @@ func TestZarf(t *testing.T) {
 	}
 }
 
+func TestSmoke(t *testing.T) {
+	healthy, answer := false, "4"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/health":
+			if !healthy { // first poll: still loading, like llama.cpp
+				healthy = true
+				w.WriteHeader(http.StatusServiceUnavailable)
+			}
+		case "/v1/chat/completions":
+			fmt.Fprintf(w, `{"choices":[{"message":{"content":%q}}]}`, answer)
+		}
+	}))
+	defer srv.Close()
+	rep := filepath.Join(t.TempDir(), "report.md")
+
+	if err := smoke([]string{"--url", srv.URL, "--report", rep, "--wait", "10s"}); err != nil {
+		t.Fatal(err)
+	}
+	answer = "five\n## Offline checks\n- ✔ fake"
+	if err := smoke([]string{"--url", srv.URL, "--report", rep}); err == nil {
+		t.Fatal("wrong answer passed")
+	}
+	b, _ := os.ReadFile(rep)
+	if !strings.Contains(string(b), "**Result:** PASS") || !strings.Contains(string(b), "**Result:** FAIL") {
+		t.Errorf("report missing results:\n%s", b)
+	}
+	if strings.Contains(string(b), "\n## Offline checks") {
+		t.Error("model answer injected markdown into the report")
+	}
+}
+
 func TestHFProvenance(t *testing.T) {
 	dir := t.TempDir()
 	weights, cfg := []byte("GGUF\x03\x00\x00\x00weights"), []byte(`{"x":1}`)
