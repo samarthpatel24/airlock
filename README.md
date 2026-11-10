@@ -8,7 +8,8 @@ Moving the files is left to Zarf or a USB drive. airlock refuses file formats th
 
 When sealing (online):
 
-- Weights must be GGUF or safetensors, identified by file header. Pickle files (`.bin`, `.pt`, or a pickle renamed to anything else) are refused, as are unknown file types and symlinks.
+- Weights must be GGUF or safetensors. GGUF needs a valid header and version. For safetensors, the tensor offsets must cover the data section exactly, so nothing can be hidden after the last tensor.
+- Pickle extensions (`.bin`, `.pt`, `.ckpt` and similar) are refused. Metadata files are checked by content: `.json` must parse, `.model` must look like a sentencepiece file, text files must be UTF-8 with no binary data, and binary pickles or zip archives are refused under any of these names. Unknown file types, symlinks and file names with control characters are refused.
 - With `--hf` and `--rev`, every file must match the upstream repo at that commit. Branch names are refused because they can move.
 - With `--clamav`, a ClamAV scan runs. It is off by default because the scanner and its database are one more downloaded thing to trust. If you ask for it and it can't run, sealing fails.
 - A manifest of every file and its SHA-256 is signed with cosign. Nothing is uploaded to a transparency log.
@@ -17,7 +18,7 @@ When verifying (offline):
 
 - The signature is checked before the manifest is parsed.
 - Files on disk must match the manifest exactly: no missing, extra, or changed files.
-- Formats are checked again.
+- Formats are checked again, on the same read that produces the hash.
 - A Markdown report is written whether the check passes or fails.
 
 ## Usage
@@ -35,15 +36,17 @@ airlock verify ./bundle --key cosign.pub
 
 ```sh
 airlock zarf ./bundle --key cosign.pub
-zarf package create . -o out
-zarf package deploy out/zarf-package-airlock-model-*.tar.zst
+zarf package create . -o out --signing-key cosign.key
+zarf package deploy out/zarf-package-airlock-model-*.tar.zst --key /etc/airlock/cosign.pub --verify=always
 ```
 
-The generated package copies the bundle and runs `airlock verify` during deploy. Put the component that serves the model after it. If verification fails, Zarf stops and the model never starts. Tested with Zarf v1.0.0.
+The generated package copies the bundle and runs `airlock verify` during deploy. Put the component that serves the model after it. If verification fails, Zarf stops and the model never starts.
+
+Sign the Zarf package and deploy with `--verify=always`. The verify step is part of the package, so on an unsigned package anyone in transit could delete it, and Zarf's default (`--verify=if-possible`) deploys unsigned packages without complaint. The same cosign key can sign both the bundle and the package. Tested with Zarf v1.0.0: unsigned packages and packages signed by another key are refused before anything runs.
 
 ## Installing airlock on the offline host
 
-The offline host needs two things, installed once: the airlock binary at `/usr/local/bin/airlock` and the public key at `/etc/airlock/cosign.pub` (change the path with `--inside-key`). Every bundle after that is verified by this copy.
+The offline host needs two things, installed once: the airlock binary at `/usr/local/bin/airlock` and the public key at `/etc/airlock/cosign.pub` (change them with `--inside-bin` and `--inside-key`). The deploy step calls the binary by absolute path, never through `PATH`. Every bundle after that is verified by this copy.
 
 Neither is shipped inside the package by default. Anyone who could alter the package could also swap the key and the verifier, so both should arrive through the site's normal software intake. You can also rebuild from source on the offline side and compare hashes, since builds are reproducible with the same Go version:
 
@@ -68,6 +71,9 @@ It does not cover:
 - Harmful model behaviour. A model in a safe format from the right commit can still be a bad model, and airlock does not evaluate outputs.
 - Changes after verification. Someone with write access between `verify` and model load could swap files. The Zarf integration runs `verify` during deploy to keep that window small.
 - A malicious upstream commit. Pinning stops later changes to the repo, but if the pinned commit is bad, airlock accepts it.
+- Rollback. An older bundle signed by the same key still verifies. Rotate keys or track versions on the offline side if that matters.
+- Chat templates. Jinja templates, in `.jinja` files or inside GGUF metadata, are not inspected. Use a loader that renders them in a sandbox (see CVE-2024-34359).
+- Small upstream files. Hugging Face publishes only a git SHA-1 for non-LFS files, so those are matched by SHA-1. Weights are LFS files and are matched by SHA-256.
 - Transparency logs. Signatures are key-based only, because air-gapped sites usually cannot reach Rekor.
 - Vulnerabilities in the serving image. Use Zarf's SBOMs or a scanner for that.
 
