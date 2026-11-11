@@ -5,10 +5,10 @@ HANDOFF.md
 .DS_Store
 demo/zsh/.zsh_sessions/
 # Impeccable: keep the design system and brief, not the working files
-.impeccable/*
-!.impeccable/config.json
-!.impeccable/design.json
-!.impeccable/surfaces/
+site/.impeccable/*
+!site/.impeccable/config.json
+!site/.impeccable/design.json
+!site/.impeccable/surfaces/
 demo/*.mp4
 
 # ruleset JSON for import in GitHub settings, kept local
