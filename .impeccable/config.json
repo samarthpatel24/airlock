@@ -1,0 +1,35 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "em-dash-overuse",
+        "value": "*",
+        "files": [
+          "site/index.html"
+        ],
+        "createdAt": "2026-11-11T17:05:08.223Z",
+        "reason": "assistant: only one real em dash (in quoted airlock CLI output); the rest are -- command-line flags in code"
+      },
+      {
+        "rule": "repeating-stripes-gradient",
+        "value": "*",
+        "files": [
+          "site/src/style.css"
+        ],
+        "createdAt": "2026-11-11T17:06:19.384Z",
+        "reason": "assistant: the repeating gradient draws the rail sleepers under the train, the agit-train world's literal track"
+      },
+      {
+        "rule": "flat-type-hierarchy",
+        "value": "*",
+        "files": [
+          "site/index.html"
+        ],
+        "createdAt": "2026-11-11T17:07:26.095Z",
+        "reason": "Claude: src/style.css sets h1 up to 14rem and section headings up to 7.5rem over 1.125rem body; the hook scans index.html without the stylesheet, and the full detect run on html+css returned no findings"
+      }
+    ]
+  }
+}

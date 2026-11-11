@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-11",
+  "title": "Design System: airlock",
+  "extensions": {
+    "colorMeta": {
+      "signal-mint": { "role": "primary", "displayName": "Signal Mint", "canonical": "#5af78e", "tonalRamp": ["#001204", "#002f12", "#005023", "#007335", "#009849", "#00bf5d", "#76db91", "#ceeed4"] },
+      "board-green": { "role": "secondary", "displayName": "Board Green", "canonical": "#c8f7c5", "tonalRamp": ["#061105", "#0c2e0c", "#244c23", "#416b40", "#608b5e", "#81ad7e", "#abcca9", "#dde8dc"] },
+      "refusal-red": { "role": "tertiary", "displayName": "Refusal Red", "canonical": "#ff5f5f", "tonalRamp": ["#230002", "#4f0008", "#800014", "#b40221", "#db3c41", "#ff6564", "#ffa6a0", "#ffdbd8"] },
+      "soot-black": { "role": "neutral", "displayName": "Soot Black", "canonical": "#0a0e0a", "tonalRamp": ["#0c0e0c", "#232723", "#3e433e", "#5c615c", "#7b807b", "#9ba19b", "#bec3be", "#e3e5e3"] },
+      "car-paint": { "role": "neutral", "displayName": "Car Paint", "canonical": "#101810", "tonalRamp": ["#0b0e0b", "#212821", "#3b453b", "#596258", "#788277", "#98a398", "#bcc4bc", "#e3e5e2"] },
+      "rail-green": { "role": "neutral", "displayName": "Rail Green", "canonical": "#2e5a37", "tonalRamp": ["#051007", "#092e13", "#204d2a", "#3f6b47", "#5e8b66", "#7ead86", "#aaccae", "#dce8de"] },
+      "board-green-dim": { "role": "neutral", "displayName": "Board Green Dim", "canonical": "#9ec49d", "tonalRamp": ["#071007", "#122d13", "#294b2a", "#476946", "#668965", "#86ab85", "#afcaae", "#dee8de"] },
+      "ash-grey": { "role": "neutral", "displayName": "Ash Grey", "canonical": "#8a9a8a", "tonalRamp": ["#0a0f0a", "#1e291f", "#384638", "#556455", "#748374", "#94a594", "#b9c5b9", "#e2e6e2"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Hero wordmark only, lowercase. Big Shoulders Stencil." },
+      "headline": { "displayName": "Headline", "purpose": "Section headings, uppercase stencil on the tilt." },
+      "title": { "displayName": "Title", "purpose": "Car names on Board Green bands." },
+      "body": { "displayName": "Body", "purpose": "Running text, Archivo at wdth 100." },
+      "label": { "displayName": "Label", "purpose": "Station lines, board labels, table heads. Archivo at wdth 75, uppercase." },
+      "code": { "displayName": "Code", "purpose": "Ids, hashes, byte counts, commands, spec blocks, plates and notes. JetBrains Mono." }
+    },
+    "shadows": [],
+    "motion": [
+      { "name": "ease-journey", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Every transition and scroll-driven move on the page." },
+      { "name": "wedge-hover", "value": "0.25s ease-journey; clip-path 0.3s ease-journey", "purpose": "Wedge button hover: fill, cut depth and shift." },
+      { "name": "link-hover", "value": "0.2s", "purpose": "Text colour and underline on nav and links." },
+      { "name": "train-pull-in", "value": "1.5s ease-journey", "purpose": "Hero train on first load, no-preference only." },
+      { "name": "hero-depart", "value": "scroll(root) 34vh to 110vh", "purpose": "Hero train translates 7vw and -1.1vw while the visitor scrolls." },
+      { "name": "verify-scan", "value": "scroll(root) 3vh to 24vh", "purpose": "Scan bar crosses the verify car." },
+      { "name": "checks-tick", "value": "scroll(root) 9vh, 15vh, 21vh (1vh each)", "purpose": "Board checks change from Checking to the mint result." },
+      { "name": "stamp-passed", "value": "scroll(root) 25vh to 31vh", "purpose": "PASSED stamp lands on the verify car." },
+      { "name": "rail-draw", "value": "view-timeline --route, cover 50vh to cover calc(100% - 50vh)", "purpose": "Route rail draws down to the bundle." },
+      { "name": "station-lit", "value": "view() cover 0% to cover 100%", "purpose": "Station mark turns mint as the bundle passes." },
+      { "name": "heading-slide", "value": "view() entry 0% to entry 90%, from translate -3.5rem", "purpose": "Headings slide in along the tilt." },
+      { "name": "siding-roll", "value": "view-timeline --siding, entry 10% to contain 15%", "purpose": "Refused train rolls in and brakes at the gate, overshoot 0.9rem." },
+      { "name": "poison-drift", "value": "view-timeline --siding, entry 10% to contain 15%", "purpose": "Poisoned car drifts off register by 6px." },
+      { "name": "stamp-refused", "value": "view-timeline --siding, contain 15% to contain 22%", "purpose": "REFUSED stamp lands from scale 1.7." },
+      { "name": "flap-flip", "value": "0.5s + n * 0.07s, steps(n), staggered by i * 0.06s", "purpose": "Split-flap cells flip to the real hash on view." }
+    ],
+    "breakpoints": [
+      { "name": "mid-min", "value": "961px" },
+      { "name": "mid-narrow", "value": "1180px" },
+      { "name": "mid-max", "value": "1359px" },
+      { "name": "stacked", "value": "960px" },
+      { "name": "phone", "value": "640px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Mint wedge with a cut right edge. Every main action on the page.",
+      "html": "<a class=\"ds-wedge\" href=\"#\">View on GitHub<svg aria-hidden=\"true\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\"><path d=\"M4 12h15M13 6l6 6-6 6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.4\" stroke-linecap=\"square\"/></svg></a>",
+      "css": ".ds-wedge { position: relative; isolation: isolate; display: inline-flex; align-items: center; gap: 0.6rem; padding: 1rem 2.2rem 1rem 1.4rem; color: var(--ink, #0a0e0a); text-decoration: none; font-family: 'Big Shoulders Stencil Variable', 'Big Shoulders Stencil', sans-serif; font-variation-settings: 'wdth' 78; font-weight: 800; font-size: 1.15rem; text-transform: uppercase; letter-spacing: 0.05em; transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1); } .ds-wedge::before { content: ''; position: absolute; inset: 0; z-index: -1; background: var(--mint, #5af78e); clip-path: polygon(0 0, 100% 0, calc(100% - 1.1rem) 100%, 0 100%); transition: background-color 0.2s, clip-path 0.3s cubic-bezier(0.16, 1, 0.3, 1), translate 0.3s cubic-bezier(0.16, 1, 0.3, 1); } .ds-wedge svg { width: 1.15em; height: 1.15em; transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1); } .ds-wedge:hover::before { background: var(--board, #c8f7c5); clip-path: polygon(0 0, 100% 0, calc(100% - 1.9rem) 100%, 0 100%); translate: 0.45rem 0; } .ds-wedge:hover svg { transform: translateX(0.4rem); } .ds-wedge:active { transform: translateY(1px); } .ds-wedge:focus-visible { outline: 3px solid var(--mint, #5af78e); outline-offset: 4px; }"
+    },
+    {
+      "name": "Inverse Button",
+      "kind": "button",
+      "refersTo": "button-inverse",
+      "description": "Soot wedge on the mint closing band.",
+      "html": "<a class=\"ds-wedge ds-wedge-inverse\" href=\"#\">View on GitHub</a>",
+      "css": ".ds-wedge-inverse { color: var(--mint, #5af78e); } .ds-wedge-inverse::before { background: var(--ink, #0a0e0a); } .ds-wedge-inverse:hover::before { background: var(--ink-2, #101810); } .ds-wedge-inverse:focus-visible { outline-color: var(--ink, #0a0e0a); }"
+    },
+    {
+      "name": "Car",
+      "kind": "custom",
+      "refersTo": "car",
+      "description": "Painted broadside with a name band, station line, spec ids and a plate. Used on the hero train and on the line.",
+      "html": "<article class=\"ds-car\"><h3 class=\"ds-car-name\">Seal</h3><p class=\"ds-station\">Online</p><dl class=\"ds-spec\"><dt>File</dt><dd>qwen2.5-0.5b-instruct-q4_k_m.gguf</dd><dt>Commit</dt><dd>9217f5db</dd></dl><span class=\"ds-plate\">Car 1</span></article>",
+      "css": ".ds-car { position: relative; background: var(--ink-2, #101810); color: var(--board, #c8f7c5); padding: 0 1.5rem 1.9rem; border: 2px solid var(--rail, #2e5a37); } .ds-car-name { margin: 0 -1.5rem; padding: 0.9rem 1.5rem 0.45rem; background: var(--board, #c8f7c5); color: var(--ink, #0a0e0a); font-family: 'Big Shoulders Stencil Variable', 'Big Shoulders Stencil', sans-serif; font-weight: 800; font-size: clamp(3.4rem, 6vw, 5.6rem); line-height: 0.86; text-transform: uppercase; } .ds-station { margin-top: 0.9rem; font-family: 'Archivo Variable', Archivo, sans-serif; font-variation-settings: 'wdth' 75; font-weight: 800; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--mint, #5af78e); } .ds-spec { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.15rem 0.7rem; margin-top: 0.55rem; font-family: 'JetBrains Mono Variable', 'JetBrains Mono', monospace; font-size: 0.8rem; line-height: 1.4; } .ds-spec dt { color: var(--grey, #8a9a8a); } .ds-spec dd { overflow-wrap: break-word; font-variant-numeric: tabular-nums; } .ds-plate { position: absolute; right: 0.6rem; top: -1.8rem; padding: 0 0.3rem; background: var(--mint, #5af78e); color: var(--ink, #0a0e0a); font-family: 'JetBrains Mono Variable', 'JetBrains Mono', monospace; font-size: 0.78rem; font-weight: 700; }"
+    },
+    {
+      "name": "Platform Board",
+      "kind": "custom",
+      "refersTo": "platform-board",
+      "description": "Black board with worn frame and tick rows. Shows the next stop and checks as they pass.",
+      "html": "<aside class=\"ds-board\"><p class=\"ds-row\"><span>Next stop</span><b>Offline host</b></p><p class=\"ds-row\"><span>Signature</span><b class=\"ds-ok\">Valid</b></p></aside>",
+      "css": ".ds-board { position: relative; width: min(23rem, 40%); background: var(--ink, #0a0e0a); } .ds-board::before { content: ''; position: absolute; inset: 0; pointer-events: none; border: 2px solid var(--board, #c8f7c5); } .ds-row { display: grid; grid-template-columns: 6.2rem 1fr; gap: 0.8rem; align-items: baseline; padding: 0.55rem 0.9rem; border-top: 1px solid var(--rail, #2e5a37); margin: 0; } .ds-row:first-child { border-top: 0; } .ds-row span { font-family: 'Archivo Variable', Archivo, sans-serif; font-variation-settings: 'wdth' 75; font-weight: 800; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--grey, #8a9a8a); } .ds-row b { font-weight: 700; font-size: 1rem; color: var(--board, #c8f7c5); } .ds-ok { color: var(--mint, #5af78e); }"
+    },
+    {
+      "name": "Stamp Passed",
+      "kind": "custom",
+      "refersTo": "stamp-pass",
+      "description": "PASSED stamp at a gate. Mint on soot, rotated.",
+      "html": "<strong class=\"ds-stamp ds-stamp-pass\">Passed</strong>",
+      "css": ".ds-stamp { position: absolute; display: inline-block; font-family: 'Big Shoulders Stencil Variable', 'Big Shoulders Stencil', sans-serif; font-weight: 900; text-transform: uppercase; letter-spacing: 0.06em; line-height: 1; padding: 0.35rem 0.75rem 0.3rem; transform: rotate(-12deg); font-size: 2.5rem; } .ds-stamp-pass { color: var(--mint, #5af78e); border: 4px solid var(--mint, #5af78e); background: var(--ink, #0a0e0a); }"
+    },
+    {
+      "name": "Stamp Refused",
+      "kind": "custom",
+      "refersTo": "stamp-refuse",
+      "description": "REFUSED stamp at the gate. The only red fill on the page.",
+      "html": "<strong class=\"ds-stamp ds-stamp-refuse\">Refused</strong>",
+      "css": ".ds-stamp { position: absolute; display: inline-block; font-family: 'Big Shoulders Stencil Variable', 'Big Shoulders Stencil', sans-serif; font-weight: 900; text-transform: uppercase; letter-spacing: 0.06em; line-height: 1; padding: 0.35rem 0.75rem 0.3rem; transform: rotate(-6deg); font-size: 2.1rem; } .ds-stamp-refuse { color: var(--ink, #0a0e0a); background: var(--red, #ff5f5f); }"
+    },
+    {
+      "name": "Code Block with Copy",
+      "kind": "custom",
+      "refersTo": "code-block",
+      "description": "Quick-start command block with a copy button that reports the result.",
+      "html": "<figure class=\"ds-code\"><figcaption>Seal and verify</figcaption><pre><code>airlock verify ./bundle --key cosign.pub</code></pre><button class=\"ds-copy\" type=\"button\"><span>Copy</span></button></figure>",
+      "css": ".ds-code { position: relative; margin: 0; background: var(--ink-2, #101810); border-top: 6px solid var(--board, #c8f7c5); padding: 1.1rem 1.3rem 1.4rem; min-width: 0; } .ds-code figcaption { font-family: 'Archivo Variable', Archivo, sans-serif; font-variation-settings: 'wdth' 75; font-weight: 800; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--grey, #8a9a8a); margin-bottom: 0.9rem; } .ds-code pre { overflow-x: auto; margin: 0; font-family: 'JetBrains Mono Variable', 'JetBrains Mono', monospace; font-size: 0.92rem; line-height: 1.7; color: var(--board, #c8f7c5); } .ds-copy { position: absolute; top: 0.7rem; right: 0.8rem; padding: 0.35rem 0.7rem; font-family: 'Archivo Variable', Archivo, sans-serif; font-variation-settings: 'wdth' 80; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--board, #c8f7c5); background: var(--ink, #0a0e0a); border: 2px solid var(--rail, #2e5a37); cursor: pointer; } .ds-copy:hover { border-color: var(--mint, #5af78e); color: var(--mint, #5af78e); }"
+    },
+    {
+      "name": "Split-flap Row",
+      "kind": "custom",
+      "description": "Hash row on the poisoned car. Cells flip to the real value on view; mismatches print red. The real value stays in the DOM as text.",
+      "html": "<p class=\"ds-flap-row\"><span>Found</span><b class=\"ds-flap-bad\" aria-label=\"64a4dcef1b89\">64a4dcef1b89</b></p>",
+      "css": ".ds-flap-row { display: grid; grid-template-columns: 4.2rem 1fr; align-items: center; margin: 0; font-family: 'JetBrains Mono Variable', 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--board, #c8f7c5); } .ds-flap-row > span { font-family: 'Archivo Variable', Archivo, sans-serif; font-variation-settings: 'wdth' 75; font-weight: 800; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--grey, #8a9a8a); } .ds-flap-bad { color: var(--red, #ff5f5f); font-size: 1.05rem; font-weight: 700; } .ds-flap-row .cell { position: relative; display: inline-block; width: 1.15em; height: 1.5em; overflow: hidden; background: var(--ink, #0a0e0a); text-align: center; line-height: 1.5em; }"
+    },
+    {
+      "name": "Refused Car",
+      "kind": "custom",
+      "refersTo": "refused-car",
+      "description": "Car turned back on the siding. Shows the message airlock prints. The poisoned variant prints off register.",
+      "html": "<article class=\"ds-reject\"><h3>Pickle files</h3><p>Formats that can run code when loaded never get sealed.</p><samp>\"pytorch_model.bin\": pickle-based format refused: it can execute code when loaded; convert to safetensors or GGUF</samp></article>",
+      "css": ".ds-reject { position: relative; padding: 0 1.2rem 1.7rem; border: 2px solid var(--rail, #2e5a37); background: var(--ink, #0a0e0a); color: var(--board-dim, #9ec49d); } .ds-reject h3 { margin: 0 -1.2rem; padding: 2rem 1.2rem 0.4rem; background: var(--board, #c8f7c5); color: var(--ink, #0a0e0a); font-family: 'Big Shoulders Stencil Variable', 'Big Shoulders Stencil', sans-serif; font-weight: 800; text-transform: uppercase; font-size: 2.2rem; line-height: 0.92; } .ds-reject p { margin-top: 0.9rem; font-size: 1rem; } .ds-reject samp { display: block; margin-top: 1rem; padding: 0.7rem 0.8rem; font-family: 'JetBrains Mono Variable', 'JetBrains Mono', monospace; font-size: 0.8rem; line-height: 1.5; color: var(--red, #ff5f5f); background: var(--ink, #0a0e0a); border: 1px solid color-mix(in srgb, var(--red, #ff5f5f) 55%, var(--ink, #0a0e0a)); overflow-wrap: anywhere; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Line of Travel",
+    "overview": "A model rides one rail from online to offline. The page is that rail: every section is a station on it, the content travels as painted cars, and the air gap is the gate the model must pass. The surface is a constructivist broadside on a soot-black ground: stencil caps set on a -2.5deg tilt, square-cut wedges for actions, and dark cars printed with halftones of real demo frames.\n\nEach section makes one claim, shows its proof as real values and recordings, and states its limit. Limits sit in a timetable on the page, not in a footnote. Refusals are cars turned back at the gate with the exact message airlock prints, not warnings or alerts. The system rejects the category default of a centred headline, two buttons and a row of feature cards, and it rejects phosphor glow, matrix rain and a fake terminal used as the look.",
+    "keyCharacteristics": [
+      "Dark only. One ground (#0a0e0a); the build has no light theme.",
+      "Stencil caps on a tilt. The lowercase wordmark is the only lowercase stencil.",
+      "Cars are the unit of content: name band, halftone side, spec ids, bogies, plate.",
+      "Mint is the action colour; red appears only on refusals.",
+      "Flat. No radii, gradients, glow or shadows. Depth comes from tilt, rails and bogies.",
+      "Scroll drives the journey. Reduced motion shows the final states."
+    ],
+    "rules": [
+      { "name": "The One Action Rule", "body": "Mint marks what the visitor can act on and what has passed. It never marks a refusal or a pending check.", "section": "colors" },
+      { "name": "The Refusal Rule", "body": "Red appears only on refused items.", "section": "colors" },
+      { "name": "The Pending Grey Rule", "body": "A check that has not ticked yet is grey. Spec keys are grey.", "section": "colors" },
+      { "name": "The Stencil Caps Rule", "body": "Headlines and car names are uppercase stencil with ink wear. The lowercase wordmark is the only lowercase stencil on the page.", "section": "typography" },
+      { "name": "The Record Rule", "body": "Mono sets the record: spec blocks, car plates, leader-line notes, commands and code.", "section": "typography" },
+      { "name": "The No-Lift Rule", "body": "Surfaces never lift on hover or scroll. A state change moves the wedge, its clip cut or a stamp, never a shadow.", "section": "elevation" },
+      { "name": "The Square Cut Rule", "body": "Nothing is rounded. Angles come from clip-path cuts and from the tilt.", "section": "shapes" },
+      { "name": "The Off-Register Rule", "body": "Only refused items print off register.", "section": "components" }
+    ],
+    "dos": [
+      "Do set each section as a station on the rail, and let the content travel as cars.",
+      "Do give every car its spec ids in mono and its plate, and pin annotations on leader lines.",
+      "Do state the limits on the page in the timetable, where the visitor reads them.",
+      "Do write the name as lowercase `airlock`.",
+      "Do give every motion a static final state under reduced motion.",
+      "Do keep mint for actions and passes only."
+    ],
+    "donts": [
+      "Don't use gradients, glow, rounded cards or lift shadows.",
+      "Don't use phosphor glow, matrix rain, or a fake terminal as the look.",
+      "Don't use red for anything but a refusal.",
+      "Don't state a licence, stars, users, testimonials, benchmarks or adoption figures. None exist yet (PRODUCT.md).",
+      "Don't use stars, flags or crowds as imagery.",
+      "Don't change the wordmark's case or set it in uppercase stencil."
+    ]
+  }
+}
