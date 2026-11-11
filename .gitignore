@@ -10,3 +10,6 @@ demo/zsh/.zsh_sessions/
 !.impeccable/design.json
 !.impeccable/surfaces/
 demo/*.mp4
+
+# ruleset JSON for import in GitHub settings, kept local
+rulesets/

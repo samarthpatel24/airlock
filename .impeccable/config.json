@@ -28,7 +28,7 @@
           "site/index.html"
         ],
         "createdAt": "2026-11-11T17:07:26.095Z",
-        "reason": "Claude: src/style.css sets h1 up to 14rem and section headings up to 7.5rem over 1.125rem body; the hook scans index.html without the stylesheet, and the full detect run on html+css returned no findings"
+        "reason": "False positive: src/style.css sets h1 up to 14rem and section headings up to 7.5rem over 1.125rem body; the hook scans index.html without the stylesheet, and the full detect run on html+css returned no findings"
       }
     ]
   }
