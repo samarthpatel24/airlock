@@ -42,7 +42,7 @@ func verify(args []string) error {
 	if err != nil {
 		return fmt.Errorf("FAIL — %w (report: %s)", err, *out)
 	}
-	fmt.Printf("✔ PASS — report: %s\n", *out)
+	fmt.Printf("%s PASS — report: %s\n", markOK, *out)
 	return nil
 }
 

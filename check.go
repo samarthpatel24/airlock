@@ -51,7 +51,7 @@ func checkCmd(args []string) error {
 	if err := needWeights(files); err != nil {
 		return err
 	}
-	fmt.Printf("✔ %d files: safe formats only\n", len(files))
+	fmt.Printf("%s %d %s: safe formats only\n", markOK, len(files), plural(len(files), "file"))
 	return nil
 }
 

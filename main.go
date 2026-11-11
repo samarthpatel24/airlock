@@ -52,6 +52,30 @@ func outside(dir, path, flagName string) error {
 	return nil
 }
 
+// Status marks are coloured only on a terminal, and never when NO_COLOR is set.
+var (
+	markOK   = mark(os.Stdout, "✔", "32")
+	markWarn = mark(os.Stdout, "!", "33")
+	markBad  = mark(os.Stderr, "✘", "31")
+)
+
+func mark(f *os.File, s, color string) string {
+	if _, off := os.LookupEnv("NO_COLOR"); off {
+		return s
+	}
+	if st, err := f.Stat(); err != nil || st.Mode()&os.ModeCharDevice == 0 {
+		return s
+	}
+	return "\x1b[" + color + "m" + s + "\x1b[0m"
+}
+
+func plural(n int, word string) string {
+	if n == 1 {
+		return word
+	}
+	return word + "s"
+}
+
 const version = "0.1.0"
 
 const usage = `airlock ` + version + ` — safety gate for AI models entering air-gapped networks
@@ -90,7 +114,7 @@ func main() {
 		os.Exit(2)
 	}
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "✘", err)
+		fmt.Fprintln(os.Stderr, markBad, err)
 		os.Exit(1)
 	}
 }

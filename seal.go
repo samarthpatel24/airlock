@@ -36,7 +36,7 @@ func seal(args []string) error {
 	}
 	m := Manifest{Version: 1, Tool: "airlock " + version, Created: time.Now().UTC().Format(time.RFC3339), Files: files}
 	m.Checks = append(m.Checks, "formats: weights are GGUF/safetensors, no pickle, no unknown files")
-	fmt.Printf("✔ %d files, safe formats only\n", len(files))
+	fmt.Printf("%s %d %s, safe formats only\n", markOK, len(files), plural(len(files), "file"))
 
 	if *repo != "" {
 		if err := checkHF(dir, *repo, *rev, files); err != nil {
@@ -44,10 +44,10 @@ func seal(args []string) error {
 		}
 		m.Model = &ModelInfo{Repo: *repo, Revision: *rev}
 		m.Checks = append(m.Checks, fmt.Sprintf("provenance: every file matches %s@%s", *repo, *rev))
-		fmt.Printf("✔ matches %s@%s\n", *repo, (*rev)[:12])
+		fmt.Printf("%s matches %s@%s\n", markOK, *repo, (*rev)[:12])
 	} else {
 		m.Checks = append(m.Checks, "provenance: SKIPPED (no --hf given)")
-		fmt.Println("! provenance skipped (no --hf)")
+		fmt.Println(markWarn, "provenance skipped (no --hf)")
 	}
 
 	mal, err := malwareScan(dir, *clam)
@@ -56,9 +56,9 @@ func seal(args []string) error {
 	}
 	m.Checks = append(m.Checks, mal)
 	if strings.HasSuffix(mal, "(ClamAV)") {
-		fmt.Println("✔", mal)
+		fmt.Println(markOK, mal)
 	} else {
-		fmt.Println("!", mal)
+		fmt.Println(markWarn, mal)
 	}
 
 	if err := clearReserved(dir); err != nil {
@@ -70,7 +70,7 @@ func seal(args []string) error {
 	if err := cosignSign(*key, filepath.Join(dir, manifestName), filepath.Join(dir, signatureName)); err != nil {
 		return err
 	}
-	fmt.Printf("✔ sealed %s\n", dir)
+	fmt.Printf("%s sealed %s\n", markOK, dir)
 	return nil
 }
 

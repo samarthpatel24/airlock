@@ -60,7 +60,7 @@ func smoke(args []string) error {
 	if err != nil {
 		return fmt.Errorf("FAIL — smoke test: %w (report: %s)", err, *out)
 	}
-	fmt.Printf("✔ PASS — model answered %q in %s (report: %s)\n", answer, took, *out)
+	fmt.Printf("%s PASS — model answered %q in %s (report: %s)\n", markOK, answer, took, *out)
 	return nil
 }
 

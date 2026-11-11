@@ -68,7 +68,7 @@ func zarfCmd(args []string) error {
 	}
 	// The verify step lives in the package, so an unsigned package lets anyone
 	// in transit delete it. Zarf's own signature closes that hole.
-	fmt.Printf("✔ bundle verified, wrote %s\n", *out)
+	fmt.Printf("%s bundle verified, wrote %s\n", markOK, *out)
 	fmt.Printf("  the deploy host must already have %s and the trusted key at %s\n", *insideBin, *insideKey)
 	fmt.Println("  sign the package, or the verify step can be removed in transit:")
 	fmt.Printf("    zarf package create %s --signing-key cosign.key\n", filepath.Dir(*out))
