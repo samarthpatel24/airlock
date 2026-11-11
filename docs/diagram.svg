@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" width="1200" height="420">
+  <title>How airlock works: seal online, move across the air gap, verify offline</title>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0 0L10 5L0 10z" fill="#5af78e"/>
+    </marker>
+  </defs>
+  <rect width="1200" height="420" rx="16" fill="#0a0e0a"/>
+  <g font-family="'JetBrains Mono', 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace">
+    <!-- Online -->
+    <rect x="40" y="60" width="400" height="320" rx="16" fill="#101810" stroke="#1f3a24" stroke-width="2"/>
+    <text x="72" y="105" font-size="16" fill="#5af78e" letter-spacing="4">ONLINE</text>
+    <text x="72" y="150" font-size="26" font-weight="700" fill="#c8f7c5">airlock seal</text>
+    <g font-size="18" fill="#8a9a8a">
+      <text x="72" y="200">refuse pickle and unknown files</text>
+      <text x="72" y="236">match the pinned HF commit</text>
+      <text x="72" y="272">sign a manifest of every file</text>
+    </g>
+
+    <!-- Air gap -->
+    <path d="M480 40V400M720 40V400" stroke="#2e5a37" stroke-width="2" stroke-dasharray="6 8"/>
+    <text x="600" y="105" font-size="16" fill="#8a9a8a" letter-spacing="4" text-anchor="middle">AIR GAP</text>
+    <rect x="572" y="190" width="56" height="56" rx="8" fill="none" stroke="#c8f7c5" stroke-width="3"/>
+    <path d="M584 208H616M584 218H616M584 228H606" stroke="#c8f7c5" stroke-width="3" stroke-linecap="round"/>
+    <text x="600" y="290" font-size="18" fill="#c8f7c5" text-anchor="middle">Zarf or USB</text>
+    <path d="M444 218H562" stroke="#5af78e" stroke-width="3" marker-end="url(#arrow)"/>
+    <path d="M638 218H756" stroke="#5af78e" stroke-width="3" marker-end="url(#arrow)"/>
+
+    <!-- Offline -->
+    <rect x="760" y="60" width="400" height="320" rx="16" fill="#101810" stroke="#1f3a24" stroke-width="2"/>
+    <text x="792" y="105" font-size="16" fill="#5af78e" letter-spacing="4">OFFLINE</text>
+    <text x="792" y="150" font-size="26" font-weight="700" fill="#c8f7c5">airlock verify</text>
+    <g font-size="18" fill="#8a9a8a">
+      <text x="792" y="200">check the signature</text>
+      <text x="792" y="236">every file must match</text>
+      <text x="792" y="272">write a report</text>
+    </g>
+    <text x="792" y="320" font-size="18" fill="#5af78e">✔ pass → serve the model</text>
+    <text x="792" y="352" font-size="18" fill="#ff5f5f">✘ fail → nothing runs</text>
+  </g>
+</svg>

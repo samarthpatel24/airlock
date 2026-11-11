@@ -1,19 +1,30 @@
-# airlock
+<h1 align="center"><img src="docs/banner.svg" alt="airlock" width="100%"></h1>
 
-airlock checks an AI model before it goes into an air-gapped network, then checks it again on the offline side before it runs.
+<p align="center"><b>Zarf moves the boxes. airlock proves the model inside is safe, genuine and unchanged.</b></p>
 
-Zarf or a USB drive moves the files. airlock proves the model inside is safe, genuine and unchanged, and leaves a report for the security team.
+<p align="center">
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#what-it-checks">What it checks</a> ·
+  <a href="#with-zarf">With Zarf</a> ·
+  <a href="#threat-model">Threat model</a>
+</p>
+
+airlock checks an AI model before it goes into an air-gapped network, then checks it again on the offline side before it runs. Zarf or a USB drive moves the files. airlock refuses unsafe formats, proves the weights are the ones you pinned, and leaves a report for the security team.
 
 ![Seal a model, verify it offline, serve it and chat with it](demo/scene1.gif)
 
 ## How it works
 
-| Where | Command | What happens |
+![Online: airlock seal checks and signs the bundle. It crosses the air gap by Zarf or USB. Offline: airlock verify checks it; pass serves the model, fail runs nothing.](docs/diagram.svg)
+
+| Command | Where | What it does |
 |---|---|---|
-| Online | `airlock seal` | Refuses formats that can run code, checks the weights against a pinned Hugging Face commit, and signs a manifest of every file. |
-| Transfer | Zarf, USB drive | Moves the bundle. airlock is not involved. |
-| Offline | `airlock verify` | Checks the signature and every file with no network and no other tools, then writes a Markdown report. |
-| Offline | `airlock smoke` | Asks the running model server a question with a known answer and adds the result to the report. |
+| `airlock seal` | Online | Refuses formats that can run code, checks the weights against a pinned Hugging Face commit, and signs a manifest of every file. |
+| `airlock verify` | Offline | Checks the signature and every file with no network and no other tools, then writes a Markdown report. |
+| `airlock smoke` | Offline | Asks the running model server a question with a known answer and adds the result to the report. |
+| `airlock check` | Anywhere | Runs only the format checks. |
+| `airlock zarf` | Online | Writes a Zarf package that runs `airlock verify` during deploy. |
 
 ## Quick start
 
@@ -23,8 +34,6 @@ cosign generate-key-pair
 airlock seal ./bundle --key cosign.key --hf Qwen/Qwen2.5-0.5B-Instruct-GGUF --rev <40-char commit>
 airlock verify ./bundle --key cosign.pub
 ```
-
-`airlock check ./bundle` runs only the format checks.
 
 After the model server starts:
 
@@ -131,3 +140,5 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o airl
 Not done yet: an offline vulnerability re-scan with a bundled database, and updates that ship only changed files.
 
 The demos are recorded with the scripts in [`demo/`](demo/).
+
+<p align="center"><img src="docs/logo.svg" alt="" width="48"></p>

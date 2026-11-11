@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 320" width="1280" height="320">
+  <title>airlock</title>
+  <rect width="1280" height="320" fill="#0a0e0a"/>
+  <g transform="translate(96 80) scale(2.5)">
+    <path d="M22 14.5H42M22 49.5H42" stroke="#2e5a37" stroke-width="2" stroke-linecap="round"/>
+    <rect x="12" y="13" width="10" height="38" rx="3" fill="#5af78e"/>
+    <rect x="42" y="13" width="10" height="38" rx="3" fill="#5af78e"/>
+    <rect x="27" y="27" width="10" height="10" rx="2" fill="#c8f7c5"/>
+  </g>
+  <g font-family="'JetBrains Mono', 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace">
+    <text x="300" y="178" font-size="104" font-weight="700" fill="#c8f7c5">airlock</text>
+    <text x="304" y="236" font-size="28" fill="#5af78e">Checks AI models in and out of air-gapped networks.</text>
+  </g>
+</svg>
