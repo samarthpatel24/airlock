@@ -1,13 +1,13 @@
 ---
 version: 1
 slug: "site-index-html"
-primary_target: "site/index.html"
+primary_target: "index.html"
 related_targets: []
 ---
 
 # airlock.sammatrix.in landing page
 
-Scope: one landing page, `site/index.html`, TypeScript + Vite static build, deployed on Vercel at airlock.sammatrix.in.
+Scope: one landing page, `index.html` in `site/`, TypeScript + Vite static build, deployed on Vercel at airlock.sammatrix.in.
 Visitor mode: Persuade.
 
 Audience and job: platform, MLOps and security engineers deciding whether airlock fits their model intake; hiring managers judging depth. Primary action: open the GitHub repo. Secondary: copy the quick start.
