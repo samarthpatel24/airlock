@@ -34,7 +34,7 @@ Two machines: an online machine that seals, and an offline host with the airlock
 - ClamAV is opt-in (`--clamav`).
 - Not covered (must be stated honestly): stolen signing key, harmful model behaviour, changes after verification, a malicious upstream commit, rollback, chat templates are not inspected, metadata values and tensor bytes are not judged, a compromised online machine, small upstream files matched by SHA-1, no transparency log, serving-image vulnerabilities.
 - Not done yet: offline vulnerability re-scan with a bundled database; delta updates.
-- Licence: not decided. Do not state one.
+- Licence: Apache-2.0 (LICENSE at the repo root). The site may say "open source".
 
 ## Brand Commitments
 
