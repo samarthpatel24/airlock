@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -53,7 +55,11 @@ func seal(args []string) error {
 		return err
 	}
 	m.Checks = append(m.Checks, mal)
-	fmt.Println(mal)
+	if strings.HasSuffix(mal, "(ClamAV)") {
+		fmt.Println("✔", mal)
+	} else {
+		fmt.Println("!", mal)
+	}
 
 	if err := clearReserved(dir); err != nil {
 		return err
@@ -61,18 +67,41 @@ func seal(args []string) error {
 	if err := writeJSON(filepath.Join(dir, manifestName), &m); err != nil {
 		return err
 	}
-	// Key-based signing with no transparency-log upload: nothing leaves the machine.
-	// ponytail: cosign 3.x marks these two flags deprecated; switch to a
-	// --signing-config with no tlog (or cosign's promised offline flag) when they go.
-	cmd := exec.Command("cosign", "sign-blob", "--yes", "--key", *key,
-		"--bundle", filepath.Join(dir, signatureName),
-		"--tlog-upload=false", "--use-signing-config=false",
-		filepath.Join(dir, manifestName))
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("cosign sign-blob: %w", err)
+	if err := cosignSign(*key, filepath.Join(dir, manifestName), filepath.Join(dir, signatureName)); err != nil {
+		return err
 	}
 	fmt.Printf("✔ sealed %s\n", dir)
+	return nil
+}
+
+// offlineSigning is a Sigstore signing config with no services at all: key
+// signing, no transparency log, no timestamp authority. Nothing leaves the machine.
+const offlineSigning = `{"mediaType":"application/vnd.dev.sigstore.signingconfig.v0.2+json",` +
+	`"caUrls":[],"oidcUrls":[],"rekorTlogUrls":[],"tsaUrls":[],` +
+	`"rekorTlogConfig":{"selector":"ANY"},"tsaConfig":{"selector":"ANY"}}`
+
+func cosignSign(key, blob, bundle string) error {
+	cfg, err := os.CreateTemp("", "airlock-signing-*.json")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(cfg.Name())
+	if _, err := cfg.WriteString(offlineSigning); err != nil {
+		cfg.Close()
+		return err
+	}
+	cfg.Close()
+	cmd := exec.Command("cosign", "sign-blob", "--yes", "--key", key, "--bundle", bundle, "--signing-config", cfg.Name(), blob)
+	cmd.Stdin = os.Stdin
+	var out bytes.Buffer
+	if _, set := os.LookupEnv("COSIGN_PASSWORD"); set {
+		cmd.Stdout, cmd.Stderr = &out, &out // no prompt coming: show cosign's output only if it fails
+	} else {
+		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr // it will prompt for the key password
+	}
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("cosign sign-blob: %w\n%s", err, out.String())
+	}
 	return nil
 }
 
