@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>airlock: check AI models in and out of air-gapped networks</title>
+  <meta name="description" content="airlock is a Go CLI that seals an AI model online and verifies it offline, before it runs in an air-gapped network. Zarf moves the boxes. airlock proves the model inside is safe, genuine and unchanged.">
+  <meta name="theme-color" content="#0a0e0a">
+  <meta property="og:title" content="airlock">
+  <meta property="og:description" content="Zarf moves the boxes. airlock proves the model inside is safe, genuine and unchanged.">
+  <meta property="og:image" content="https://airlock.sammatrix.in/social.png">
+  <meta property="og:url" content="https://airlock.sammatrix.in/">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="canonical" href="https://airlock.sammatrix.in/">
+</head>
+<body>
+  <svg width="0" height="0" class="sprite" aria-hidden="true" focusable="false">
+    <defs>
+      <!-- track: two rails on sleepers, one in ink for the mint band, one in rail green for the dark ground -->
+      <pattern id="p-track-ink" width="34" height="16" patternUnits="userSpaceOnUse"><rect x="0" width="6" height="16" fill="#0a0e0a"/><rect y="2" width="34" height="3" fill="#0a0e0a"/><rect y="11" width="34" height="3" fill="#0a0e0a"/></pattern>
+      <pattern id="p-track" width="34" height="16" patternUnits="userSpaceOnUse"><rect x="0" width="6" height="16" fill="#2e5a37"/><rect y="2" width="34" height="3" fill="#8a9a8a"/><rect y="11" width="34" height="3" fill="#8a9a8a"/></pattern>
+    </defs>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="square"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><path d="M8 8h12v12H8zM4 16V4h12" fill="none" stroke="currentColor" stroke-width="2.4"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="square"/></symbol>
+    <symbol id="i-cross" viewBox="0 0 24 24"><path d="M5 5l14 14M19 5L5 19" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="square"/></symbol>
+    <symbol id="i-bogie" viewBox="0 0 64 24"><path d="M4 6h56" stroke="currentColor" stroke-width="4"/><circle cx="16" cy="13" r="9" fill="currentColor"/><circle cx="48" cy="13" r="9" fill="currentColor"/><circle cx="16" cy="13" r="2.5" style="fill:var(--hub,#8a9a8a)"/><circle cx="48" cy="13" r="2.5" style="fill:var(--hub,#8a9a8a)"/></symbol>
+    <symbol id="i-logo" viewBox="0 0 64 64"><path d="M22 14.5H42M22 49.5H42" stroke="#2e5a37" stroke-width="2" stroke-linecap="round"/><rect x="12" y="13" width="10" height="38" rx="3" fill="#5af78e"/><rect x="42" y="13" width="10" height="38" rx="3" fill="#5af78e"/><rect x="27" y="27" width="10" height="10" rx="2" fill="#c8f7c5"/></symbol>
+  </svg>
+
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="platform">
+    <a class="brand" href="#top" aria-label="airlock, back to top">
+      <svg class="brand-mark" aria-hidden="true"><use href="#i-logo"/></svg>
+      <span>airlock</span>
+    </a>
+    <nav class="lines" aria-label="Sections">
+      <a href="#line">How it works</a>
+      <a href="#start">Quick start</a>
+      <a href="#gate">What it stops</a>
+      <a href="#limits">Limits</a>
+    </nav>
+    <a class="wedge wedge-sm" href="https://github.com/samarthpatel24/airlock">GitHub<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <h1 id="hero-title" class="stencil">airlock</h1>
+        <p class="slogan">Zarf moves the boxes. airlock proves the model inside is safe, genuine and unchanged.</p>
+        <p class="lede">A Go CLI that seals an AI model online and checks it again on the offline side, before it runs in an air-gapped network.</p>
+        <div class="actions">
+          <a class="wedge" href="https://github.com/samarthpatel24/airlock">View on GitHub<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+          <a class="rail-link" href="#start">Quick start</a>
+        </div>
+      </div>
+
+      <div class="track" aria-label="The model's journey: seal online, move across the air gap, verify offline">
+        <div class="train">
+          <div class="car engine" aria-hidden="true">
+            <svg class="engine-mark"><use href="#i-logo"/></svg>
+            <span class="plate">Nº AL-01</span>
+            <div class="bogies"><svg><use href="#i-bogie"/></svg><svg><use href="#i-bogie"/></svg></div>
+          </div>
+          <article class="car print-seal">
+            <h2 class="stencil">Seal</h2>
+            <p class="station">Online</p>
+            <dl class="spec">
+              <dt>File</dt><dd>qwen2.5-0.5b-instruct-q4_k_m.gguf</dd>
+              <dt>Commit</dt><dd>9217f5db</dd>
+              <dt>Signed</dt><dd>cosign</dd>
+            </dl>
+            <span class="plate">Car 1</span>
+            <p class="note">Pinned Hugging Face commit</p>
+            <div class="bogies" aria-hidden="true"><svg><use href="#i-bogie"/></svg><svg><use href="#i-bogie"/></svg></div>
+          </article>
+          <article class="car print-zarf">
+            <h2 class="stencil">Move</h2>
+            <p class="station">Air gap</p>
+            <dl class="spec">
+              <dt>By</dt><dd>Zarf or USB</dd>
+              <dt>Bytes</dt><dd>491 400 032</dd>
+            </dl>
+            <span class="plate">Car 2</span>
+            <p class="note">Same bytes on both sides</p>
+            <div class="bogies" aria-hidden="true"><svg><use href="#i-bogie"/></svg><svg><use href="#i-bogie"/></svg></div>
+          </article>
+          <div class="gap-gate" aria-hidden="true"><span>Air gap</span></div>
+          <article class="car car-verify print-verify">
+            <h2 class="stencil">Verify</h2>
+            <p class="station">Offline</p>
+            <dl class="spec">
+              <dt>SHA-256</dt><dd>74a4da8c…</dd>
+              <dt>Network</dt><dd>none</dd>
+            </dl>
+            <span class="plate">Car 3</span>
+            <p class="note">Checked with no network</p>
+            <div class="scan" aria-hidden="true"></div>
+            <strong class="stamp stamp-pass">Passed</strong>
+            <div class="bogies" aria-hidden="true"><svg><use href="#i-bogie"/></svg><svg><use href="#i-bogie"/></svg></div>
+          </article>
+        </div>
+        <svg class="rails" aria-hidden="true"><rect width="100%" height="100%" fill="url(#p-track-ink)"/></svg>
+      </div>
+
+      <aside class="board" aria-label="Platform board">
+        <p class="board-row"><span>Next stop</span><b>Offline host</b></p>
+        <p class="board-row tick tick-1"><span>Signature</span><b><i class="wait" aria-hidden="true">Checking</i><i class="ok"><svg aria-hidden="true"><use href="#i-check"/></svg>Valid</i></b></p>
+        <p class="board-row tick tick-2"><span>Files</span><b><i class="wait" aria-hidden="true">Checking</i><i class="ok"><svg aria-hidden="true"><use href="#i-check"/></svg>1 of 1 match</i></b></p>
+        <p class="board-row tick tick-3"><span>Formats</span><b><i class="wait" aria-hidden="true">Checking</i><i class="ok"><svg aria-hidden="true"><use href="#i-check"/></svg>GGUF, safe</i></b></p>
+      </aside>
+    </section>
+
+    <div class="route">
+      <div class="route-rail" aria-hidden="true"><span class="bundle"></span></div>
+
+      <section class="line station-stop" id="line" aria-labelledby="line-title">
+        <h2 id="line-title" class="stencil heading">Seal online. Carry it across. Verify offline.</h2>
+        <div class="consist">
+          <ol class="stops">
+            <li class="car stop print-seal">
+              <h3 class="stencil">Seal</h3>
+              <p class="station">Online · <code>airlock seal</code></p>
+              <ul>
+                <li>Refuses formats that can run code when loaded, like pickle.</li>
+                <li>Matches every file to a pinned Hugging Face commit.</li>
+                <li>Signs a manifest of every file and its SHA-256 with cosign.</li>
+              </ul>
+              <span class="plate">Car 1</span>
+              <div class="bogies" aria-hidden="true"><svg><use href="#i-bogie"/></svg><svg><use href="#i-bogie"/></svg></div>
+            </li>
+            <li class="car stop stop-gap">
+              <h3 class="stencil">Move</h3>
+              <p class="station">Air gap · Zarf or USB</p>
+              <ul>
+                <li>The bundle travels on its own. airlock does not ride this car.</li>
+                <li>Anything that changes a byte on the way shows up at the next stop.</li>
+              </ul>
+              <span class="plate">Car 2</span>
+              <div class="bogies" aria-hidden="true"><svg><use href="#i-bogie"/></svg><svg><use href="#i-bogie"/></svg></div>
+            </li>
+            <li class="car stop print-verify">
+              <h3 class="stencil">Verify</h3>
+              <p class="station">Offline · <code>airlock verify</code></p>
+              <ul>
+                <li>Checks the signature before it reads the manifest.</li>
+                <li>Every file must match: none missing, extra or changed.</li>
+                <li>Writes a Markdown report for the security team, pass or fail.</li>
+              </ul>
+              <span class="plate">Car 3</span>
+              <div class="bogies" aria-hidden="true"><svg><use href="#i-bogie"/></svg><svg><use href="#i-bogie"/></svg></div>
+            </li>
+          </ol>
+          <svg class="rails" aria-hidden="true"><rect width="100%" height="100%" fill="url(#p-track)"/></svg>
+        </div>
+
+        <div class="manifest" role="region" aria-label="All commands" tabindex="0">
+          <table>
+            <caption class="sr-only">airlock commands</caption>
+            <thead><tr><th scope="col">Command</th><th scope="col">Where</th><th scope="col">What it does</th></tr></thead>
+            <tbody>
+              <tr><td><code>airlock seal</code></td><td>Online</td><td>Checks formats and provenance, then signs a manifest.</td></tr>
+              <tr><td><code>airlock verify</code></td><td>Offline</td><td>Checks signature and every file with no network, writes a report.</td></tr>
+              <tr><td><code>airlock smoke</code></td><td>Offline</td><td>Asks the running model server a question with a known answer.</td></tr>
+              <tr><td><code>airlock check</code></td><td>Anywhere</td><td>Runs only the format checks.</td></tr>
+              <tr><td><code>airlock zarf</code></td><td>Online</td><td>Writes a Zarf package that runs <code>verify</code> during deploy.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="start station-stop" id="start" aria-labelledby="start-title">
+        <h2 id="start-title" class="stencil heading">Quick start</h2>
+        <p class="intro">Build it, seal a model, verify it, then test the running server. Tested end to end with Qwen2.5 0.5B Instruct (Q4_K_M, commit <code>9217f5db</code>).</p>
+        <div class="departures">
+          <figure class="code">
+            <figcaption>Seal and verify</figcaption>
+            <pre tabindex="0"><code id="code-seal">go build -o airlock .
+cosign generate-key-pair
+airlock seal ./bundle --key cosign.key --hf Qwen/Qwen2.5-0.5B-Instruct-GGUF --rev &lt;40-char commit&gt;
+airlock verify ./bundle --key cosign.pub</code></pre>
+            <button class="copy" type="button" data-copy="code-seal"><svg aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button>
+          </figure>
+          <figure class="code">
+            <figcaption>Smoke test the server</figcaption>
+            <pre tabindex="0"><code id="code-smoke">llama-server -m bundle/qwen2.5-0.5b-instruct-q4_k_m.gguf --port 8080 --offline
+airlock smoke --url http://127.0.0.1:8080</code></pre>
+            <button class="copy" type="button" data-copy="code-smoke"><svg aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button>
+          </figure>
+        </div>
+      </section>
+
+      <section class="reel station-stop" id="reel" aria-labelledby="reel-title">
+        <h2 id="reel-title" class="stencil heading">Watch it run</h2>
+        <div class="frames">
+          <figure class="frame">
+            <video src="/media/scene1.mp4" poster="/media/scene1-poster.jpg" muted loop playsinline preload="none" width="1600" height="1034"></video>
+            <figcaption>Seal, verify, serve with llama.cpp, smoke test, then chat with the model.</figcaption>
+          </figure>
+          <figure class="frame frame-alt">
+            <video src="/media/scene2.mp4" poster="/media/scene2-poster.jpg" muted loop playsinline preload="none" width="1600" height="1118"></video>
+            <figcaption>A pickle file is refused. A poisoned copy tells users to run an attacker's script. The same model in a signed Zarf package is stopped by airlock.</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="gate station-stop" id="gate" aria-labelledby="gate-title">
+        <h2 id="gate-title" class="stencil heading">Stopped at the gate</h2>
+        <p class="intro">Each car on this siding was turned back. The message under it is the one airlock prints.</p>
+        <div class="siding">
+          <ul class="refused">
+            <li class="car reject print-zarf">
+              <h3 class="stencil">Pickle files</h3>
+              <p>Formats that can run code when loaded never get sealed.</p>
+              <samp>"pytorch_model.bin": pickle-based format refused: it can execute code when loaded; convert to safetensors or GGUF</samp>
+              <strong class="stamp stamp-refuse">Refused</strong>
+              <div class="bogies" aria-hidden="true"><svg><use href="#i-bogie"/></svg><svg><use href="#i-bogie"/></svg></div>
+            </li>
+            <li class="car reject print-zarf">
+              <h3 class="stencil">An untrusted key</h3>
+              <p>A bundle signed by any key the offline host does not hold.</p>
+              <samp>invalid signature (wrong key or tampered)</samp>
+              <strong class="stamp stamp-refuse">Refused</strong>
+              <div class="bogies" aria-hidden="true"><svg><use href="#i-bogie"/></svg><svg><use href="#i-bogie"/></svg></div>
+            </li>
+            <li class="car reject print-zarf">
+              <h3 class="stencil">Weights from the wrong commit</h3>
+              <p>Every file must match the pinned upstream commit. Branch names are refused because they can move.</p>
+              <samp>"model.gguf": sha256 differs from upstream</samp>
+              <strong class="stamp stamp-refuse">Refused</strong>
+              <div class="bogies" aria-hidden="true"><svg><use href="#i-bogie"/></svg><svg><use href="#i-bogie"/></svg></div>
+            </li>
+            <li class="car reject reject-poison print-chat">
+              <h3 class="stencil">A swapped or poisoned model</h3>
+              <p>The demo's poisoned copy tells users to pipe a script into <code>sudo sh</code>. One changed byte after sealing, and the hash no longer matches.</p>
+              <div class="flaps">
+                <p><span>Sealed</span><b class="flap" data-final="74a4da8c9fdb">74a4da8c9fdb</b></p>
+                <p><span>Found</span><b class="flap flap-bad" data-final="64a4dcef1b89">64a4dcef1b89</b></p>
+              </div>
+              <samp>FAIL — hash mismatch: "qwen2.5-0.5b-instruct-q4_k_m.gguf" (tampered or corrupted)</samp>
+              <strong class="stamp stamp-refuse">Refused</strong>
+              <div class="bogies" aria-hidden="true"><svg><use href="#i-bogie"/></svg><svg><use href="#i-bogie"/></svg></div>
+            </li>
+          </ul>
+          <div class="barrier" aria-hidden="true"><span>Gate</span></div>
+          <svg class="rails" aria-hidden="true"><rect width="100%" height="100%" fill="url(#p-track)"/></svg>
+        </div>
+      </section>
+
+      <section class="zarf station-stop" id="zarf" aria-labelledby="zarf-title">
+        <div class="zarf-copy">
+          <h2 id="zarf-title" class="stencil heading">Zarf moves the boxes</h2>
+          <p>Zarf's signature proves the package is the one the packager built. It does not prove what went into it. A model swapped before packaging passes Zarf's checks.</p>
+          <p>airlock runs as a deploy step inside the package. It checks the model against its own seal, made earlier from the real files, so the swap is refused and the model server never starts.</p>
+          <p>Always sign the package and deploy with <code>--verify=always</code>. Tested with Zarf v1.0.0.</p>
+        </div>
+        <figure class="code code-zarf">
+          <figcaption>Package and deploy</figcaption>
+          <pre tabindex="0"><code id="code-zarf">airlock zarf ./bundle --key cosign.pub
+zarf package create . -o out --signing-key cosign.key
+zarf package deploy out/zarf-package-airlock-model-*.tar.zst --key /etc/airlock/cosign.pub --verify=always</code></pre>
+          <button class="copy" type="button" data-copy="code-zarf"><svg aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button>
+        </figure>
+      </section>
+
+      <section class="limits station-stop" id="limits" aria-labelledby="limits-title">
+        <h2 id="limits-title" class="stencil heading">End of the line</h2>
+        <p class="intro">What airlock does not cover, so you can plan for it.</p>
+        <dl class="timetable">
+          <div><dt>A stolen signing key</dt><dd>Keep <code>cosign.key</code> off shared machines and rotate through a trusted channel.</dd></div>
+          <div><dt>Harmful model behaviour</dt><dd>A safe format from the right commit can still be a bad model. Outputs are not evaluated.</dd></div>
+          <div><dt>Changes after verification</dt><dd>Running <code>verify</code> during the Zarf deploy keeps that window small.</dd></div>
+          <div><dt>A malicious upstream commit</dt><dd>Pinning stops later changes, not a bad commit.</dd></div>
+          <div><dt>Rollback</dt><dd>An older bundle signed by the same key still verifies.</dd></div>
+          <div><dt>Chat templates</dt><dd>Not inspected. Render them in a sandboxed loader.</dd></div>
+          <div><dt>Metadata values and tensor bytes</dt><dd>Read but not judged.</dd></div>
+          <div><dt>A compromised online machine</dt><dd>Seal trusts the machine it runs on.</dd></div>
+          <div><dt>Small upstream files</dt><dd>Matched by git SHA-1, since that is all Hugging Face publishes for them.</dd></div>
+          <div><dt>Transparency logs</dt><dd>Key-based signatures only, because air-gapped sites rarely reach Rekor.</dd></div>
+          <div><dt>The serving image</dt><dd>Scan it with Zarf's SBOMs or a scanner.</dd></div>
+        </dl>
+        <p class="more"><a class="rail-link" href="https://github.com/samarthpatel24/airlock#06--threat-model">Full threat model in the README</a></p>
+      </section>
+    </div>
+
+    <section class="close" aria-labelledby="close-title">
+      <h2 id="close-title" class="stencil">Seal. Move. Verify.</h2>
+      <a class="wedge wedge-lg" href="https://github.com/samarthpatel24/airlock">View on GitHub<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+    </section>
+  </main>
+
+  <footer class="depot">
+    <svg class="brand-mark" aria-hidden="true"><use href="#i-logo"/></svg>
+    <p>airlock is on <a href="https://github.com/samarthpatel24/airlock">GitHub</a>. Made by <a href="https://sammatrix.in">sammatrix</a>.</p>
+  </footer>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

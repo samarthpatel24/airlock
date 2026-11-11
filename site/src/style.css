@@ -1,0 +1,657 @@
+:root {
+  --ink: #0a0e0a;
+  --ink-2: #101810;
+  --rail: #2e5a37;
+  --board: #c8f7c5;
+  --board-dim: color-mix(in srgb, var(--board) 78%, var(--ink));
+  --mint: #5af78e;
+  --grey: #8a9a8a;
+  --red: #ff5f5f;
+
+  --stencil: "Big Shoulders Stencil Variable", "Big Shoulders Stencil", sans-serif;
+  --sans: "Archivo Variable", "Archivo", system-ui, sans-serif;
+  --mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
+
+  --gutter: clamp(1rem, 4vw, 4rem);
+  --section: clamp(5rem, 11vw, 9.5rem);
+  --tilt: -2.5deg; /* the line of travel */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --ink-wear: url(/print/ink.png);
+
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; }
+
+html {
+  background: var(--ink);
+  color: var(--board);
+  scroll-padding-top: 5rem;
+  scrollbar-color: var(--rail) var(--ink);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--sans);
+  font-size: 1.125rem;
+  line-height: 1.55;
+  font-variation-settings: "wdth" 100;
+  overflow-x: clip;
+  text-rendering: optimizeLegibility;
+}
+
+::selection { background: var(--mint); color: var(--ink); }
+:focus-visible { outline: 3px solid var(--mint); outline-offset: 4px; }
+a { color: inherit; }
+img, video, svg { display: block; max-width: 100%; }
+code, samp, pre { font-family: var(--mono); font-variant-ligatures: none; }
+p, li, dd, figcaption { text-wrap: pretty; }
+p code, li code, dd code, td code { font-size: 0.88em; color: var(--mint); }
+
+.sprite { position: absolute; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+.skip {
+  position: absolute; left: var(--gutter); top: -4rem; z-index: 20;
+  background: var(--mint); color: var(--ink); padding: 0.6rem 1rem; font-weight: 700;
+}
+.skip:focus { top: 0.75rem; }
+
+/* Stencil caps carry printed ink wear: a generated noise mask lifts small patches of ink */
+.stencil {
+  font-family: var(--stencil);
+  font-weight: 800;
+  text-transform: uppercase;
+  line-height: 0.86;
+  letter-spacing: -0.005em;
+  text-wrap: balance;
+  mask: var(--ink-wear) 0 0 / 22rem repeat;
+}
+
+/* Header: the platform strip */
+.platform {
+  position: sticky; top: 0; z-index: 10;
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 1.5rem;
+  padding: 0.7rem var(--gutter);
+  background: var(--ink);
+  border-bottom: 2px solid var(--rail);
+}
+.brand {
+  display: inline-flex; align-items: center; gap: 0.6rem; text-decoration: none;
+  font-family: var(--stencil); font-weight: 800; font-size: 1.9rem; line-height: 1;
+}
+.brand-mark { width: 2.2rem; height: 2.2rem; }
+.lines { display: flex; gap: clamp(1rem, 2.4vw, 2.2rem); justify-self: center; }
+.lines a, .rail-link {
+  font-variation-settings: "wdth" 80; font-weight: 700; font-size: 0.95rem;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  text-decoration: underline; text-decoration-color: transparent;
+  text-decoration-thickness: 2px; text-underline-offset: 0.35em;
+  transition: text-decoration-color 0.2s, color 0.2s;
+}
+.lines a:hover, .lines a:focus-visible { text-decoration-color: var(--mint); color: var(--mint); }
+
+/* Wedge buttons: the cut that drives every action; hover drives the wedge further in */
+.wedge {
+  position: relative; isolation: isolate;
+  display: inline-flex; align-items: center; gap: 0.6rem;
+  padding: 1rem 2.2rem 1rem 1.4rem;
+  color: var(--ink); text-decoration: none;
+  font-variation-settings: "wdth" 78; font-weight: 800; font-size: 1.15rem;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  transition: transform 0.25s var(--ease);
+}
+.wedge::before {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  background: var(--mint);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 1.1rem) 100%, 0 100%);
+  transition: background-color 0.2s, clip-path 0.3s var(--ease), translate 0.3s var(--ease);
+}
+.wedge svg { width: 1.15em; height: 1.15em; transition: transform 0.25s var(--ease); }
+.wedge:hover::before {
+  background: var(--board);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 1.9rem) 100%, 0 100%);
+  translate: 0.45rem 0;
+}
+.wedge:hover svg { transform: translateX(0.4rem); }
+.wedge:active { transform: translateY(1px); }
+.wedge-sm { padding: 0.55rem 1.6rem 0.55rem 0.95rem; font-size: 0.95rem; }
+.wedge-lg { padding: 1.3rem 3rem 1.3rem 1.8rem; font-size: 1.4rem; }
+.rail-link {
+  font-size: 1.05rem;
+  text-decoration-color: var(--board);
+}
+.rail-link:hover { color: var(--mint); text-decoration-color: var(--mint); }
+
+/* Cars: dark painted sides carrying a halftone of a real demo frame, a pale name band,
+   bogies underneath. Used in the hero, on the line and on the siding. */
+.car {
+  position: relative; isolation: isolate;
+  background: var(--ink-2); color: var(--board);
+}
+[class*="print-"]::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: var(--print-ink, color-mix(in srgb, var(--rail) 60%, var(--ink-2)));
+  mask: var(--print) var(--print-pos, 0 0) / auto repeat;
+}
+.print-seal { --print: url(/print/seal.png); --print-pos: -24px 6px; }
+.print-verify { --print: url(/print/seal.png); --print-pos: -40px -110px; }
+.print-zarf { --print: url(/print/zarf.png); --print-pos: -30px -20px; }
+.print-chat { --print: url(/print/chat.png); --print-pos: -40px -180px; }
+
+.bogies {
+  position: absolute; left: 7%; right: 7%; bottom: -1.05rem; z-index: -2;
+  display: flex; justify-content: space-between;
+  color: var(--ink); --hub: var(--board);
+  pointer-events: none;
+}
+.bogies svg { width: 3.4rem; height: 1.3rem; }
+.rails { display: block; width: 100%; height: 1rem; }
+
+/* Hero */
+.hero {
+  position: relative;
+  min-height: clamp(44rem, calc(100svh - 3.9rem), 58rem);
+  padding: clamp(2.5rem, 6vh, 4.5rem) var(--gutter) 0;
+  overflow: hidden;
+}
+.hero-copy { position: relative; z-index: 2; max-width: 40rem; }
+.hero h1 {
+  font-size: clamp(5.5rem, 15.5vw, 14rem);
+  text-transform: none;
+  line-height: 0.8;
+  margin-left: -0.04em;
+}
+.slogan {
+  margin-top: 1.6rem;
+  font-variation-settings: "wdth" 84; font-weight: 700;
+  font-size: clamp(1.4rem, 2.3vw, 2rem); line-height: 1.2;
+  max-width: 24ch; text-wrap: balance;
+}
+.lede { margin-top: 1rem; color: var(--board-dim); max-width: 46ch; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 1.4rem 2rem; margin-top: 2.2rem; }
+
+.track {
+  position: absolute; z-index: 1;
+  left: 35%; bottom: clamp(7rem, 16vh, 10.5rem);
+  transform: rotate(-9deg); transform-origin: 0 100%;
+}
+.track::before {
+  /* the band the train rides on */
+  content: ""; position: absolute; left: -10%; right: -40vw; top: -42%; bottom: -46%; z-index: -1;
+  background: var(--mint);
+  clip-path: polygon(0 42%, 100% 0, 100% 100%, 0 90%);
+}
+.train { display: flex; align-items: flex-end; gap: 0.9rem; }
+.track .car {
+  flex: none;
+  width: clamp(10.5rem, 13vw, 14rem); min-height: clamp(10rem, 12.5vw, 12.5rem);
+  padding: 0 1rem 1.1rem;
+  border: 2px solid var(--ink);
+}
+.track .car h2 {
+  margin: 0 -1rem; padding: 0.6rem 1rem 0.35rem;
+  background: var(--board); color: var(--ink);
+  font-size: clamp(2.3rem, 3.3vw, 3.2rem);
+}
+.station {
+  margin-top: 0.7rem;
+  font-variation-settings: "wdth" 75; font-weight: 800; font-size: 0.85rem;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--mint);
+}
+.spec {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.15rem 0.7rem;
+  margin-top: 0.55rem; font-family: var(--mono); font-size: 0.8rem; line-height: 1.4;
+}
+.spec dt { color: var(--grey); }
+.spec dd { overflow-wrap: break-word; font-variant-numeric: tabular-nums; }
+.plate {
+  position: absolute; right: 0.6rem; top: -1.8rem;
+  font-family: var(--mono); font-size: 0.78rem; color: var(--ink); font-weight: 700;
+  background: var(--mint); padding: 0 0.3rem;
+  mask: var(--ink-wear) 37px 11px / 14rem repeat;
+}
+/* leader-line annotations, printed on the band under the rails */
+.note {
+  position: absolute; left: 1rem; top: calc(100% + 2.6rem);
+  padding-left: 0.55rem;
+  font-family: var(--mono); font-size: 0.74rem; font-weight: 700; line-height: 1.2;
+  color: var(--ink); width: calc(100% - 1rem);
+}
+.note::before {
+  content: ""; position: absolute; left: 0; bottom: 0.15rem; height: 2.85rem; width: 2px;
+  background: var(--ink);
+}
+.car-verify .note { left: auto; right: 0.6rem; padding: 0 0.55rem 0 0; text-align: right; }
+.car-verify .note::before { left: auto; right: 0; }
+.engine {
+  width: clamp(8.5rem, 10.5vw, 11.5rem) !important; min-height: clamp(11.5rem, 14.5vw, 14rem) !important;
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  background: var(--ink); border: 3px solid var(--board) !important;
+  padding: 1rem !important;
+}
+.engine-mark { width: 68%; height: auto; aspect-ratio: 1; }
+.gap-gate {
+  flex: none; align-self: stretch; width: 3.4rem; margin: -2.5rem 0.2rem -1.6rem;
+  border-inline: 3px dashed var(--ink);
+  display: grid; place-items: center;
+}
+.gap-gate span {
+  writing-mode: vertical-rl; transform: rotate(180deg);
+  font-variation-settings: "wdth" 75; font-weight: 800; font-size: 0.85rem;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink);
+}
+.track > .rails { position: absolute; left: -4%; width: 104%; bottom: -1.9rem; }
+.scan {
+  position: absolute; top: 0; bottom: 0; left: 0; width: 0.35rem; z-index: 2;
+  background: var(--mint); border-inline: 2px solid var(--ink);
+  opacity: 0; pointer-events: none;
+}
+
+.stamp {
+  position: absolute; z-index: 3;
+  font-family: var(--stencil); font-weight: 900; text-transform: uppercase;
+  letter-spacing: 0.06em; line-height: 1;
+  padding: 0.35rem 0.75rem 0.3rem;
+  transform: rotate(-12deg);
+  mask: var(--ink-wear) 120px 40px / 16rem repeat;
+}
+.stamp-pass {
+  /* stamped on the gate side, over the rails */
+  left: -2.2rem; bottom: -3.1rem;
+  font-size: clamp(1.8rem, 2.6vw, 2.5rem);
+  color: var(--mint); border: 4px solid var(--mint); background: var(--ink);
+}
+.stamp-refuse {
+  right: 0.9rem; top: -1.2rem;
+  font-size: clamp(1.5rem, 2.2vw, 2.1rem);
+  color: var(--ink); background: var(--red);
+  transform: rotate(-6deg);
+}
+
+.board {
+  position: absolute; z-index: 2; left: var(--gutter); bottom: clamp(2rem, 5vh, 3.5rem);
+  width: min(23rem, 40%);
+  background: var(--ink);
+}
+.board::before {
+  /* the painted frame wears like the lettering */
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  border: 2px solid var(--board);
+  mask: var(--ink-wear) 210px 90px / 20rem repeat;
+}
+.board-row {
+  display: grid; grid-template-columns: 6.2rem 1fr; gap: 0.8rem; align-items: baseline;
+  padding: 0.55rem 0.9rem; border-top: 1px solid var(--rail);
+}
+.board-row:first-child { border-top: 0; }
+.board-row span {
+  font-variation-settings: "wdth" 75; font-weight: 800; font-size: 0.8rem;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--grey);
+}
+.board-row b { display: grid; font-weight: 700; font-size: 1rem; }
+.board-row b > i { grid-area: 1 / 1; font-style: normal; }
+.board-row .ok { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--mint); }
+.board-row .wait { color: var(--grey); visibility: hidden; }
+.ok svg { width: 1.05rem; height: 1.05rem; flex: none; }
+
+/* The route: one rail runs from the first section to the end of the line. Each section is a
+   station on it; the bundle rides the rail at the middle of the screen. */
+.route { position: relative; }
+.route-rail {
+  position: absolute; top: var(--section); bottom: 0; left: calc(var(--gutter) / 2 - 2px); width: 4px;
+  background: var(--rail);
+  view-timeline: --route block;
+}
+.route-rail::before {
+  content: ""; position: absolute; inset: 0;
+  background: var(--mint); transform-origin: 50% 0;
+}
+.route-rail::after {
+  /* buffer stop */
+  content: ""; position: absolute; bottom: 0; left: -0.7rem; width: calc(1.4rem + 4px); height: 0.45rem;
+  background: var(--board);
+}
+.bundle {
+  position: sticky; top: 50vh; z-index: 1;
+  display: block; width: 1.05rem; height: 1.05rem; margin: -0.52rem 0 0 calc(2px - 0.52rem);
+  background: var(--board); outline: 3px solid var(--ink);
+}
+.station-stop { position: relative; }
+.station-stop::before {
+  /* the station mark on the rail, lit once the bundle has passed it */
+  content: ""; position: absolute; left: calc(var(--gutter) / 2 - 0.8rem); top: calc(var(--section) + 0.6rem);
+  width: 1.6rem; height: 0.5rem; background: var(--mint);
+}
+
+/* Sections */
+section:not(.hero) { padding: var(--section) var(--gutter) 0; }
+.heading {
+  font-size: clamp(3rem, 8.4vw, 7.5rem);
+  max-width: 14ch;
+  transform: rotate(var(--tilt)); transform-origin: 0 100%;
+  margin-bottom: clamp(2.5rem, 5vw, 4rem);
+}
+.intro { max-width: 58ch; color: var(--board-dim); margin: -1.5rem 0 2.5rem; }
+
+/* The line: three cars coupled on one rising rail */
+.consist {
+  --gap: clamp(1.2rem, 2.4vw, 2.2rem);
+  transform: rotate(var(--tilt)); transform-origin: 0 100%;
+  margin-top: clamp(3rem, 6vw, 5rem);
+}
+.stops {
+  list-style: none; padding: 0;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--gap);
+}
+.stop {
+  padding: 0 1.5rem 1.9rem;
+  border: 2px solid var(--rail);
+}
+.stop h3 {
+  margin: 0 -1.5rem; padding: 0.9rem 1.5rem 0.45rem;
+  background: var(--board); color: var(--ink);
+  font-size: clamp(3.4rem, 6vw, 5.6rem);
+}
+.stop .station { margin-top: 0.9rem; }
+.stop .plate { color: var(--ink); }
+.stop .station code { color: var(--mint); font-size: 0.95em; text-transform: none; letter-spacing: 0; }
+.stop ul { list-style: none; padding: 0; margin-top: 1.1rem; display: grid; gap: 0.7rem; }
+.stop li { position: relative; padding-left: 1.3rem; line-height: 1.45; }
+.stop li::before {
+  content: ""; position: absolute; left: 0; top: 0.5em; width: 0.55rem; height: 0.55rem;
+  background: var(--mint);
+}
+.stop-gap { background: var(--ink); border: 3px dashed var(--board); }
+.stop-gap h3 { background: none; color: var(--board); }
+.route .bogies { color: var(--rail); --hub: var(--grey); }
+.stops .car:not(:last-child) .bogies::after {
+  /* coupler to the next car */
+  content: ""; position: absolute; left: 100%; top: 0.2rem; width: calc(var(--gap) + 16%); height: 5px;
+  background: var(--rail);
+}
+.consist > .rails { width: calc(100% + 3rem); margin: 0.7rem 0 0 -1.5rem; }
+
+.manifest { margin-top: clamp(3.5rem, 7vw, 5.5rem); overflow-x: auto; }
+.manifest table { width: 100%; border-collapse: collapse; }
+.manifest th {
+  text-align: left; padding: 0 1.2rem 0.7rem 0;
+  font-variation-settings: "wdth" 75; font-weight: 800; font-size: 0.85rem;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--grey);
+  border-bottom: 3px solid var(--board);
+}
+.manifest td { padding: 0.95rem 1.2rem 0.95rem 0; border-bottom: 1px solid var(--rail); vertical-align: baseline; }
+.manifest td:first-child { white-space: nowrap; }
+.manifest td:first-child code { font-size: 1rem; }
+.manifest td:nth-child(2) {
+  font-variation-settings: "wdth" 75; font-weight: 800; font-size: 0.9rem;
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--board-dim); white-space: nowrap;
+}
+
+/* Quick start */
+.departures { display: grid; grid-template-columns: 1.55fr 1fr; gap: 1.5rem; align-items: start; }
+.code {
+  position: relative; background: var(--ink-2);
+  border-top: 6px solid var(--board);
+  padding: 1.1rem 1.3rem 1.4rem;
+  min-width: 0;
+}
+.code figcaption {
+  font-variation-settings: "wdth" 75; font-weight: 800; font-size: 0.85rem;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--grey);
+  margin-bottom: 0.9rem;
+}
+.code pre {
+  overflow-x: auto; padding-bottom: 0.4rem;
+  font-size: 0.92rem; line-height: 1.7; color: var(--board);
+  scrollbar-color: var(--rail) transparent;
+}
+.copy {
+  position: absolute; top: 0.7rem; right: 0.8rem;
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.35rem 0.7rem;
+  font: inherit; font-variation-settings: "wdth" 80; font-weight: 700; font-size: 0.85rem;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--board); background: var(--ink); border: 2px solid var(--rail);
+  cursor: pointer; transition: border-color 0.2s, color 0.2s;
+}
+.copy svg { width: 1rem; height: 1rem; }
+.copy:hover { border-color: var(--mint); color: var(--mint); }
+.copy[data-state="done"] {
+  border-color: var(--mint); color: var(--mint);
+  /* punched like a ticket */
+  clip-path: polygon(0 0, 100% 0, 100% 32%, calc(100% - 0.45rem) 50%, 100% 68%, 100% 100%, 0 100%);
+}
+.copy[data-state="error"] { border-color: var(--board); color: var(--board); }
+
+/* Reel */
+.frames { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(1.5rem, 3vw, 3rem); align-items: start; }
+.frame { transform: rotate(-1.2deg); }
+.frame-alt { transform: rotate(1.1deg); margin-top: 3.5rem; }
+.frame video {
+  width: 100%; height: auto; background: var(--ink-2);
+  border: 3px solid var(--board);
+}
+.frame figcaption { margin-top: 1rem; max-width: 52ch; color: var(--board-dim); }
+
+/* The gate: refused cars coupled on a siding, the poisoned one braked against the barrier */
+.siding {
+  position: relative;
+  transform: rotate(var(--tilt)); transform-origin: 0 100%;
+  margin-top: 4.5rem; padding-right: 4.2rem;
+  view-timeline: --siding block;
+}
+.refused {
+  list-style: none; padding: 0;
+  display: grid; grid-template-columns: 1fr 1fr 1fr 1.4fr; gap: 1.1rem; align-items: stretch;
+}
+.reject {
+  padding: 0 1.2rem 1.7rem;
+  border: 2px solid var(--rail);
+}
+.reject h3 {
+  margin: 0 -1.2rem; padding: 2rem 1.2rem 0.4rem;
+  background: var(--board); color: var(--ink);
+  font-size: clamp(1.7rem, 2.3vw, 2.4rem); line-height: 0.92;
+}
+.reject p { margin-top: 0.9rem; color: var(--board-dim); font-size: 1rem; }
+.reject samp {
+  display: block; margin-top: 1rem; padding: 0.7rem 0.8rem;
+  font-size: 0.8rem; line-height: 1.5; color: var(--red);
+  background: var(--ink); border: 1px solid color-mix(in srgb, var(--red) 55%, var(--ink));
+  overflow-wrap: anywhere;
+}
+.refused .car:not(:last-child) .bogies::after {
+  content: ""; position: absolute; left: 100%; top: 0.2rem; width: calc(1.1rem + 16%); height: 5px;
+  background: var(--rail);
+}
+/* The poisoned car prints off register: a red pass of the whole car, drifted */
+.reject-poison { --print-ink: color-mix(in srgb, var(--red) 40%, var(--ink-2)); --drift: 6px; }
+.reject-poison::after {
+  content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  border: 2px solid var(--red); translate: var(--drift) calc(var(--drift) * 0.6);
+  mix-blend-mode: screen;
+}
+.reject-poison h3 {
+  text-shadow: calc(var(--drift) * 0.6) calc(var(--drift) * 0.35) 0 color-mix(in srgb, var(--red) 70%, transparent);
+}
+.flaps { margin-top: 1rem; display: grid; gap: 0.35rem; font-family: var(--mono); }
+.flaps p { margin: 0; display: grid; grid-template-columns: 4.2rem 1fr; align-items: center; color: var(--board); font-size: 0.8rem; }
+.flaps p > span { color: var(--grey); text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.72rem; font-family: var(--sans); font-weight: 800; font-variation-settings: "wdth" 75; }
+.flap { display: flex; gap: 2px; font-weight: 700; font-size: 1.05rem; }
+.flap .cell {
+  position: relative; display: block; width: 1.15em; height: 1.5em; overflow: hidden;
+  background: var(--ink); text-align: center; line-height: 1.5em;
+}
+.flap .cell::after {
+  /* the hinge */
+  content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--ink-2);
+}
+.flap .strip { display: block; }
+.flap .strip i { display: block; font-style: normal; height: 1.5em; }
+.flap-bad { color: var(--red); }
+.flap .cells { display: flex; gap: 2px; }
+.flap .strip { translate: 0 calc(var(--n) * -1.5em); }
+.flipping .strip { animation: flip calc(0.5s + var(--n) * 0.07s) steps(var(--n), end) calc(var(--i) * 0.06s) both; }
+.flipping .flap-bad .strip { animation-delay: calc(0.5s + var(--i) * 0.06s); }
+@keyframes flip { from { translate: 0 0; } }
+.barrier {
+  position: absolute; right: 0; top: -2.4rem; bottom: -1.1rem; width: 3rem;
+  border-inline: 3px dashed var(--grey);
+  display: grid; place-items: center;
+}
+.barrier span {
+  writing-mode: vertical-rl; transform: rotate(180deg);
+  font-variation-settings: "wdth" 75; font-weight: 800; font-size: 0.85rem;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--grey);
+}
+.siding > .rails { width: calc(100% + 1.5rem); margin: 0.7rem 0 0 -1.5rem; }
+
+/* Zarf */
+.zarf { display: grid; grid-template-columns: 1fr 1.1fr; gap: clamp(2rem, 5vw, 4.5rem); align-items: end; }
+.zarf .heading { margin-bottom: 2rem; }
+.zarf-copy p { max-width: 54ch; }
+.zarf-copy p + p { margin-top: 1rem; }
+
+/* Limits timetable */
+.timetable { display: grid; grid-template-columns: 1fr 1fr; column-gap: clamp(2rem, 5vw, 4rem); border-top: 3px solid var(--board); }
+.timetable div {
+  display: grid; grid-template-columns: minmax(9rem, 13rem) 1fr; gap: 1rem;
+  padding: 0.95rem 0; border-bottom: 1px solid var(--rail);
+}
+.timetable dt { font-variation-settings: "wdth" 82; font-weight: 700; }
+.timetable dd { color: var(--board-dim); }
+.more { margin-top: 2.2rem; }
+
+/* Close */
+.close {
+  margin-top: var(--section);
+  padding-block: clamp(4rem, 9vw, 7rem) !important;
+  background: var(--mint); color: var(--ink);
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 2rem;
+}
+.close h2 { font-size: clamp(3.4rem, 9vw, 8.5rem); transform: rotate(-3deg); transform-origin: 0 100%; }
+.close .wedge { color: var(--mint); }
+.close .wedge::before { background: var(--ink); }
+.close .wedge:hover::before { background: var(--ink-2); }
+.close :focus-visible { outline-color: var(--ink); }
+
+.depot {
+  display: flex; align-items: center; gap: 0.9rem;
+  padding: 1.6rem var(--gutter) 2rem; color: var(--board-dim); font-size: 0.95rem;
+}
+.depot .brand-mark { width: 1.8rem; height: 1.8rem; }
+.depot a { text-underline-offset: 0.25em; }
+.depot a:hover { color: var(--mint); }
+
+/* Motion: one journey, driven by scroll. Without motion (or without scroll timelines) every
+   element shows its final state: board checked, PASSED and REFUSED stamped, rail drawn. */
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+  .train { animation: pull-in 1.5s var(--ease) both; }
+
+  @supports (animation-timeline: scroll()) {
+    /* the hero train departs; at the gate the verify car is scanned, checks tick, then PASSED */
+    .track { animation: depart linear both; animation-timeline: scroll(root); animation-range: 34vh 110vh; }
+    .scan { animation: scan linear both; animation-timeline: scroll(root); animation-range: 3vh 24vh; }
+    .tick .wait { visibility: visible; animation: hide linear both; animation-timeline: scroll(root); }
+    .tick .ok { animation: print linear both; animation-timeline: scroll(root); }
+    .board .tick-1 i { animation-range: 9vh 10vh; }
+    .board .tick-2 i { animation-range: 15vh 16vh; }
+    .board .tick-3 i { animation-range: 21vh 22vh; }
+    .stamp-pass { animation: stamp linear both; animation-timeline: scroll(root); animation-range: 25vh 31vh; }
+
+    /* the rail draws itself down to the bundle; stations light as it passes */
+    .route-rail::before { animation: draw linear both; animation-timeline: --route; animation-range: cover 50vh cover calc(100% - 50vh); }
+    .station-stop::before { animation: lit linear both; animation-timeline: view(); animation-range: cover 0% cover 100%; }
+
+    /* stencil headings slide in along their angle */
+    .heading { animation: slide-in linear both; animation-timeline: view(); animation-range: entry 0% entry 90%; }
+
+    /* the refused train rolls in and brakes hard at the gate; the poisoned car drifts off register */
+    .refused { animation: roll linear both; animation-timeline: --siding; animation-range: entry 10% contain 15%; }
+    .reject-poison { animation: drift linear both; animation-timeline: --siding; animation-range: entry 10% contain 15%; }
+    .reject .stamp-refuse { animation: stamp linear both; animation-timeline: --siding; animation-range: contain 15% contain 22%; }
+  }
+}
+
+@keyframes pull-in { from { transform: translateX(-42%); } }
+@keyframes stamp { from { opacity: 0; scale: 1.7; } }
+@keyframes print { from { opacity: 0; } }
+@keyframes hide { to { opacity: 0; } }
+@keyframes scan { 0% { opacity: 1; left: 0; } 90% { opacity: 1; } 100% { opacity: 0; left: calc(100% - 0.35rem); } }
+@keyframes depart { to { translate: 7vw -1.1vw; } }
+@keyframes draw { from { transform: scaleY(0); } }
+@keyframes lit { 0%, 49% { background: var(--rail); } 50%, 100% { background: var(--mint); } }
+@keyframes slide-in { from { translate: -3.5rem 0.15rem; } }
+@keyframes roll {
+  0% { translate: -70vw 0; }
+  88% { translate: 0.9rem 0; animation-timing-function: var(--ease); }
+  100% { translate: 0 0; }
+}
+@keyframes drift { from { --drift: 0px; } }
+@property --drift { syntax: "<length>"; inherits: true; initial-value: 6px; }
+
+/* Mid widths: the whole train scales down as one piece and the copy column narrows */
+@media (min-width: 961px) and (max-width: 1359px) {
+  .hero-copy { max-width: min(40rem, 41vw); }
+  .hero h1 { font-size: clamp(5.5rem, 13vw, 12rem); }
+  .track { left: 43%; transform: rotate(-9deg) scale(0.8); }
+  .reject { padding-inline: 1rem; }
+  .reject h3 { margin-inline: -1rem; padding-inline: 1rem; }
+}
+@media (min-width: 961px) and (max-width: 1180px) {
+  .track { left: 45%; transform: rotate(-9deg) scale(0.66); }
+}
+
+/* Narrow screens: the train runs below the copy; the line and the siding stack */
+@media (max-width: 960px) {
+  .hero { min-height: 0; padding-bottom: 3rem; }
+  .track { position: relative; left: 0; right: auto; bottom: auto; margin: 5.5rem 0 7rem; width: max-content; transform: rotate(-6deg); }
+  .board { position: relative; left: 0; bottom: 0; width: 100%; max-width: 26rem; }
+  .route > section { padding-left: calc(var(--gutter) + 1.2rem); }
+  .route-rail { left: calc(var(--gutter) / 2); }
+  .station-stop::before { left: calc(var(--gutter) / 2 - 0.6rem); width: 1.2rem; }
+  .consist, .siding { transform: none; }
+  .stops, .refused { grid-template-columns: 1fr; gap: 2.4rem; }
+  .stops .car .bogies::after, .refused .car .bogies::after { display: none; }
+  .consist > .rails, .siding > .rails { display: none; }
+  .siding { padding-right: 0; padding-bottom: 4.5rem; }
+  .barrier { top: auto; left: 0; right: 0; bottom: 0; width: auto; height: 2.6rem; border-inline: 0; border-block: 3px dashed var(--grey); }
+  .barrier span { writing-mode: horizontal-tb; transform: none; }
+  .refused { animation: none !important; }
+  .reject .stamp-refuse { animation-timeline: view(); animation-range: entry 40% entry 100%; }
+  .departures, .frames, .zarf, .timetable { grid-template-columns: 1fr; }
+  .frame-alt { margin-top: 0; }
+}
+@media (max-width: 640px) {
+  body { font-size: 1.0625rem; }
+  .platform { grid-template-columns: 1fr auto; gap: 0.6rem 1rem; }
+  .lines { grid-column: 1 / -1; grid-row: 2; justify-self: start; overflow-x: auto; padding-bottom: 0.2rem; gap: 0.95rem; }
+  .lines a { white-space: nowrap; font-size: 0.8rem; }
+  /* the hero line turns vertical: cars stack down the screen and the gap crosses it */
+  .track { width: calc(100% - 1.2rem); margin: 4rem 0.6rem 3.5rem; transform: rotate(-3deg); transform-origin: 50% 50%; }
+  .track::before { left: -1.5rem; right: -1.5rem; top: -1.5rem; bottom: -2.5rem; clip-path: polygon(0 3%, 100% 0, 100% 97%, 0 100%); }
+  .train { flex-direction: column; align-items: stretch; gap: 1.7rem; }
+  .track .car, .engine { width: 100% !important; min-height: 0 !important; }
+  .engine { flex-direction: row; justify-content: flex-start; padding: 0.7rem 1rem !important; }
+  .engine-mark { width: 3.2rem; }
+  .plate { top: 0.7rem; right: 0.8rem; color: var(--ink); background: var(--board); }
+  .note { position: static; padding: 0; margin-top: 0.6rem; color: var(--grey); white-space: normal; }
+  .note::before { display: none; }
+  .track .bogies, .track > .rails { display: none; }
+  .gap-gate { width: auto; height: 3rem; margin: -0.5rem 0; border-inline: 0; border-block: 3px dashed var(--ink); }
+  .gap-gate span { writing-mode: horizontal-tb; transform: none; }
+  .stamp-pass { left: auto; right: 0.6rem; bottom: -1.3rem; }
+  .car-verify .note { text-align: left; }
+  html { scroll-padding-top: 7rem; }
+  .manifest thead { display: none; }
+  .manifest tr { display: grid; grid-template-columns: 1fr auto; gap: 0.2rem 1rem; padding: 0.9rem 0; border-bottom: 1px solid var(--rail); }
+  .manifest td { padding: 0; border: 0; }
+  .manifest td:last-child { grid-column: 1 / -1; }
+  .timetable div { grid-template-columns: 1fr; gap: 0.2rem; }
+  .close { flex-direction: column; align-items: flex-start; }
+}
