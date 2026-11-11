@@ -74,7 +74,7 @@ func doVerify(dir, keyPath string, r *report) error {
 	if err != nil {
 		return err
 	}
-	r.pass(fmt.Sprintf("all %d files match the manifest (no missing, extra, or changed files)", len(m.Files)))
+	r.pass(fmt.Sprintf("every file matches the manifest (%d %s; no missing, extra, or changed files)", len(m.Files), plural(len(m.Files), "file")))
 	if err := needWeights(files); err != nil {
 		return err
 	}
