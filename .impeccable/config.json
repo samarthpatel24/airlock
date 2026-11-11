@@ -10,7 +10,7 @@
           "site/index.html"
         ],
         "createdAt": "2026-11-11T17:05:08.223Z",
-        "reason": "assistant: only one real em dash (in quoted airlock CLI output); the rest are -- command-line flags in code"
+        "reason": "Exception: only one real em dash (in quoted airlock CLI output); the rest are -- command-line flags in code"
       },
       {
         "rule": "repeating-stripes-gradient",
@@ -19,7 +19,7 @@
           "site/src/style.css"
         ],
         "createdAt": "2026-11-11T17:06:19.384Z",
-        "reason": "assistant: the repeating gradient draws the rail sleepers under the train, the agit-train world's literal track"
+        "reason": "Exception: the repeating gradient draws the rail sleepers under the train, the agit-train world's literal track"
       },
       {
         "rule": "flat-type-hierarchy",
