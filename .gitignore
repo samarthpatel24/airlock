@@ -2,3 +2,11 @@
 *.key
 airlock-report.md
 HANDOFF.md
+.DS_Store
+demo/zsh/.zsh_sessions/
+# Impeccable: keep the design system and brief, not the working files
+.impeccable/*
+!.impeccable/config.json
+!.impeccable/design.json
+!.impeccable/surfaces/
+demo/*.mp4
