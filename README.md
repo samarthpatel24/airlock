@@ -3,6 +3,14 @@
 <p align="center"><b>Zarf moves the boxes. airlock proves the model inside is safe, genuine and unchanged.</b></p>
 
 <p align="center">
+  <a href="https://airlock.sammatrix.in">airlock.sammatrix.in</a>
+  <br><br>
+  <a href="https://github.com/samarthpatel24/airlock/actions/workflows/ci.yml"><img src="https://github.com/samarthpatel24/airlock/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/samarthpatel24/airlock/releases"><img src="https://img.shields.io/github/v/release/samarthpatel24/airlock" alt="Release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/licence-Apache--2.0-blue" alt="Licence: Apache-2.0"></a>
+</p>
+
+<p align="center">
   <a href="#01--how-it-works">How it works</a> ·
   <a href="#02--quick-start">Quick start</a> ·
   <a href="#03--what-it-checks">What it checks</a> ·
@@ -40,10 +48,26 @@ An AI model gets checked twice: before it goes into an air-gapped network, and a
 
 ## 02 · Quick start
 
-*Build, seal, verify, then test the running server.*
+*Install, seal, verify, then test the running server.*
+
+### Install
+
+Download a release binary for your platform, check the signed checksums, then install it:
 
 ```sh
-go build -o airlock .
+curl -LO "https://github.com/samarthpatel24/airlock/releases/download/v0.1.0/{airlock_linux_amd64,checksums.txt,checksums.txt.sigstore.json}"
+cosign verify-blob checksums.txt --bundle checksums.txt.sigstore.json --certificate-identity https://github.com/samarthpatel24/airlock/.github/workflows/release.yml@refs/tags/v0.1.0 --certificate-oidc-issuer https://token.actions.githubusercontent.com
+sha256sum --ignore-missing -c checksums.txt
+sudo install -m 0755 airlock_linux_amd64 /usr/local/bin/airlock
+```
+
+- Binaries: `linux` and `darwin`, each `amd64` and `arm64`.
+- The checksums are signed keyless by the release workflow, so `verify-blob` proves they were built by this repository's release job for that tag. This check needs the internet; do it on the online side before carrying the binary across.
+- Or build from source with Go 1.22 or newer: `go build -o airlock .`
+
+### Seal and verify
+
+```sh
 cosign generate-key-pair
 airlock seal ./bundle --key cosign.key --hf Qwen/Qwen2.5-0.5B-Instruct-GGUF --rev <40-char commit>
 airlock verify ./bundle --key cosign.pub
@@ -65,6 +89,8 @@ The smoke test:
 - Shows that the server answers. It does not prove the server loaded the verified files.
 
 Tested end to end with Qwen2.5 0.5B Instruct (Q4_K_M, commit `9217f5db`): the live Hugging Face check, seal, verify, and a smoke test that answered "4".
+
+Also tested with a safetensors model, `hf-internal-testing/tiny-random-gpt2` at commit `71034c5d`: seal and verify pass, a changed byte in the header is refused as an invalid header, and a changed byte in the weights is refused as a hash mismatch.
 
 <br>
 
@@ -204,6 +230,10 @@ Keep `-buildvcs=false`. Without it, a build from a git checkout embeds the commi
 
 - An offline vulnerability re-scan with a bundled database
 - Updates that ship only changed files
+
+Planned work and known gaps are tracked in [issues](https://github.com/samarthpatel24/airlock/issues). Report security problems privately, as described in [SECURITY.md](SECURITY.md).
+
+Licensed under [Apache-2.0](LICENSE).
 
 The demos are recorded with the scripts in [`demo/`](demo/).
 
